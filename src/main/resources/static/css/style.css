@@ -1,0 +1,4 @@
+.product-img { height: 180px; object-fit: cover; }
+.thumb { width: 64px; height: 48px; object-fit: cover; }
+.card-title { min-height: 2.6em; }
+.price { color: #d70018; font-weight: 700; }

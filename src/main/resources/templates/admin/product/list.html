@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Quản lý sản phẩm')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Quản lý sản phẩm</h3>
+        <a class="btn btn-success" th:href="@{/admin/products/new}">+ Thêm sản phẩm</a>
+    </div>
+
+    <form class="row g-2 mb-3" th:action="@{/admin/products}" method="get">
+        <div class="col-md-5"><input class="form-control" name="keyword" th:value="${keyword}" placeholder="Tên sản phẩm"></div>
+        <div class="col-md-4">
+            <select class="form-select" name="categoryId">
+                <option value="">-- Tất cả danh mục --</option>
+                <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}"
+                        th:selected="${c.id == categoryId}"></option>
+            </select>
+        </div>
+        <div class="col-md-3"><button class="btn btn-primary w-100">Lọc</button></div>
+    </form>
+
+    <table class="table table-bordered table-hover align-middle">
+        <thead class="table-light">
+        <tr><th>ID</th><th>Ảnh</th><th>Tên</th><th>Danh mục</th><th class="text-end">Giá</th><th class="text-end">Tồn</th><th></th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="p : ${products.content}">
+            <td th:text="${p.id}"></td>
+            <td><img class="thumb rounded" th:src="${p.imageUrl}" alt=""></td>
+            <td th:text="${p.name}"></td>
+            <td th:text="${p.category.name}"></td>
+            <td class="text-end" th:text="${#numbers.formatDecimal(p.price, 0, 'POINT', 0, 'COMMA')} + ' ₫'"></td>
+            <td class="text-end" th:text="${p.quantity}"></td>
+            <td class="text-nowrap">
+                <a class="btn btn-sm btn-outline-primary" th:href="@{/admin/products/{id}/edit(id=${p.id})}">Sửa</a>
+                <form th:action="@{/admin/products/{id}/delete(id=${p.id})}" method="post" class="d-inline"
+                      onsubmit="return confirm('Xoá sản phẩm này?')">
+                    <button class="btn btn-sm btn-outline-danger">Xoá</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <nav th:if="${products.totalPages > 1}">
+        <ul class="pagination justify-content-center">
+            <li class="page-item" th:each="i : ${#numbers.sequence(0, products.totalPages - 1)}"
+                th:classappend="${i == products.number} ? 'active'">
+                <a class="page-link" th:href="@{/admin/products(keyword=${keyword}, categoryId=${categoryId}, page=${i})}"
+                   th:text="${i + 1}"></a>
+            </li>
+        </ul>
+    </nav>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

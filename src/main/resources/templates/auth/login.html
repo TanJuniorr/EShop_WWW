@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Đăng nhập')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container" style="max-width:420px">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+    <h3 class="mb-3">Đăng nhập</h3>
+
+    <div th:if="${param.error != null and param.error[0] == 'disabled'}" class="alert alert-warning">Tài khoản đã bị khoá.</div>
+    <div th:if="${param.error != null and param.error[0] == 'bad'}" class="alert alert-danger">Sai tên đăng nhập hoặc mật khẩu.</div>
+
+    <!-- th:action tự chèn <input type="hidden" name="_csrf" ...> -->
+    <form th:action="@{/login}" method="post">
+        <div class="mb-3">
+            <label class="form-label">Tên đăng nhập</label>
+            <input class="form-control" name="username" required autofocus>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Mật khẩu</label>
+            <input class="form-control" type="password" name="password" required>
+        </div>
+        <button class="btn btn-primary w-100">Đăng nhập</button>
+    </form>
+    <p class="mt-3 text-center">Chưa có tài khoản? <a th:href="@{/register}">Đăng ký</a></p>
+    <p class="small text-muted">Demo: seller1 / customer1 – mật khẩu 123456</p>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
