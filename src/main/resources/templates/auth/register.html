@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Đăng ký')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container" style="max-width:560px">
+    <h3 class="mb-3">Đăng ký tài khoản khách hàng</h3>
+    <form th:action="@{/register}" th:object="${form}" method="post">
+        <div th:if="${#fields.hasGlobalErrors()}" class="alert alert-danger" th:errors="*{global}"></div>
+
+        <div class="mb-2">
+            <label class="form-label">Tên đăng nhập *</label>
+            <input class="form-control" th:field="*{username}" th:errorclass="is-invalid">
+            <div class="invalid-feedback" th:errors="*{username}"></div>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Họ tên *</label>
+            <input class="form-control" th:field="*{fullName}" th:errorclass="is-invalid">
+            <div class="invalid-feedback" th:errors="*{fullName}"></div>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Email *</label>
+            <input type="email" class="form-control" th:field="*{email}" th:errorclass="is-invalid">
+            <div class="invalid-feedback" th:errors="*{email}"></div>
+        </div>
+        <div class="row">
+            <div class="col mb-2">
+                <label class="form-label">Số điện thoại</label>
+                <input class="form-control" th:field="*{phone}" th:errorclass="is-invalid">
+                <div class="invalid-feedback" th:errors="*{phone}"></div>
+            </div>
+            <div class="col mb-2">
+                <label class="form-label">Địa chỉ</label>
+                <input class="form-control" th:field="*{address}">
+            </div>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Mật khẩu *</label>
+            <input type="password" class="form-control" th:field="*{password}" th:errorclass="is-invalid">
+            <div class="invalid-feedback" th:errors="*{password}"></div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Nhập lại mật khẩu *</label>
+            <input type="password" class="form-control" th:field="*{confirmPassword}" th:errorclass="is-invalid">
+            <div class="invalid-feedback" th:errors="*{confirmPassword}"></div>
+        </div>
+        <button class="btn btn-success w-100">Đăng ký</button>
+    </form>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

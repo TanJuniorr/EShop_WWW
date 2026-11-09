@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Danh mục')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Danh mục sản phẩm</h3>
+        <a class="btn btn-success" th:href="@{/admin/categories/new}">+ Thêm danh mục</a>
+    </div>
+    <table class="table table-bordered table-hover align-middle">
+        <thead class="table-light">
+        <tr><th style="width:70px">ID</th><th>Tên</th><th>Mô tả</th><th style="width:170px"></th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="c : ${categories}">
+            <td th:text="${c.id}"></td>
+            <td th:text="${c.name}"></td>
+            <td th:text="${c.description}"></td>
+            <td class="text-nowrap">
+                <a class="btn btn-sm btn-outline-primary" th:href="@{/admin/categories/{id}/edit(id=${c.id})}">Sửa</a>
+                <form th:action="@{/admin/categories/{id}/delete(id=${c.id})}" method="post" class="d-inline"
+                      onsubmit="return confirm('Xoá danh mục này?')">
+                    <button class="btn btn-sm btn-outline-danger">Xoá</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(categories)}"><td colspan="4" class="text-center">Chưa có dữ liệu</td></tr>
+        </tbody>
+    </table>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

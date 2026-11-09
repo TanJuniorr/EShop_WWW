@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head(${product.name})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+    <div class="row g-4">
+        <div class="col-md-5"><img class="img-fluid rounded border" th:src="${product.imageUrl}" th:alt="${product.name}"></div>
+        <div class="col-md-7">
+            <small class="text-muted" th:text="${product.category.name}"></small>
+            <h3 th:text="${product.name}"></h3>
+            <h4 class="price" th:text="${#numbers.formatDecimal(product.price, 0, 'POINT', 0, 'COMMA')} + ' ₫'"></h4>
+            <p th:text="${product.description}"></p>
+            <p>Còn lại: <b th:text="${product.quantity}"></b> sản phẩm</p>
+
+            <form th:action="@{/cart/add}" method="post">
+                <input type="hidden"
+                       th:name="${_csrf.parameterName}"
+                       th:value="${_csrf.token}">
+
+                <input type="hidden"
+                       name="productId"
+                       th:value="${product.id}">
+
+                <button type="submit">Thêm vào giỏ</button>
+            </form>
+
+            <a class="btn btn-link px-0" th:href="@{/products}">← Tiếp tục xem hàng</a>
+        </div>
+    </div>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

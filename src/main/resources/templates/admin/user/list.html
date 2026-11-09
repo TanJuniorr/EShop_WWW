@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Tài khoản')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Tài khoản</h3>
+        <a class="btn btn-success" th:href="@{/admin/users/new}">+ Thêm tài khoản</a>
+    </div>
+    <table class="table table-bordered align-middle">
+        <thead class="table-light"><tr><th>ID</th><th>Username</th><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="u : ${users}">
+            <td th:text="${u.id}"></td>
+            <td th:text="${u.username}"></td>
+            <td th:text="${u.fullName}"></td>
+            <td th:text="${u.email}"></td>
+            <td><span class="badge" th:classappend="${u.role.name() == 'ROLE_SELLER'} ? 'bg-danger' : 'bg-primary'" th:text="${u.role}"></span></td>
+            <td th:text="${u.enabled} ? 'Hoạt động' : 'Bị khoá'"></td>
+            <td class="text-nowrap">
+                <a class="btn btn-sm btn-outline-primary" th:href="@{/admin/users/{id}/edit(id=${u.id})}">Sửa</a>
+                <form th:action="@{/admin/users/{id}/delete(id=${u.id})}" method="post" class="d-inline"
+                      onsubmit="return confirm('Xoá tài khoản này?')">
+                    <button class="btn btn-sm btn-outline-danger">Xoá</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Đơn hàng của tôi')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container">
+    <h3>Đơn hàng của tôi</h3>
+    <div th:if="${#lists.isEmpty(orders)}" class="alert alert-info">Bạn chưa có đơn hàng nào.</div>
+    <table class="table table-hover" th:unless="${#lists.isEmpty(orders)}">
+        <thead><tr><th>#</th><th>Ngày đặt</th><th>Thanh toán</th><th>Trạng thái</th><th class="text-end">Tổng tiền</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="o : ${orders}">
+            <td th:text="${o.id}"></td>
+            <td th:text="${#temporals.format(o.orderDate, 'dd/MM/yyyy HH:mm')}"></td>
+            <td th:text="${o.paymentMethod}"></td>
+            <td><span class="badge bg-info text-dark" th:text="${o.status}"></span></td>
+            <td class="text-end" th:text="${#numbers.formatDecimal(o.totalAmount, 0, 'POINT', 0, 'COMMA')} + ' ₫'"></td>
+            <td><a class="btn btn-sm btn-outline-primary" th:href="@{/orders/{id}(id=${o.id})}">Xem</a></td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Chuyển khoản')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container text-center" style="max-width:520px">
+    <h3>Thanh toán đơn #<span th:text="${order.id}"></span></h3>
+    <img src="https://placehold.co/240x240?text=QR+CODE" class="my-3 border rounded" alt="QR">
+    <table class="table text-start">
+        <tr><th>Ngân hàng</th><td>Vietcombank – CN TP.HCM</td></tr>
+        <tr><th>Số tài khoản</th><td>0123 456 789</td></tr>
+        <tr><th>Chủ tài khoản</th><td>CONG TY ESHOP</td></tr>
+        <tr><th>Số tiền</th><td class="price" th:text="${#numbers.formatDecimal(order.totalAmount, 0, 'POINT', 0, 'COMMA')} + ' ₫'"></td></tr>
+        <tr><th>Nội dung CK</th><td th:text="'ESHOP' + ${order.id}"></td></tr>
+    </table>
+    <form th:action="@{/orders/{id}/pay(id=${order.id})}" method="post">
+        <button class="btn btn-success btn-lg">Tôi đã chuyển khoản</button>
+    </form>
+    <p class="text-muted small mt-2">(Demo: bấm nút để giả lập ngân hàng xác nhận đã nhận tiền)</p>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

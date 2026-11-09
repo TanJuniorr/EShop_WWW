@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Sản phẩm')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container" style="max-width:760px">
+    <h3 th:text="${product.id == null} ? 'Thêm sản phẩm' : 'Sửa sản phẩm'"></h3>
+    <form th:action="@{/admin/products/save}" th:object="${product}" method="post">
+        <input type="hidden" th:field="*{id}">
+
+        <div class="mb-3">
+            <label class="form-label">Tên sản phẩm *</label>
+            <input class="form-control" th:field="*{name}" th:errorclass="is-invalid">
+            <div class="invalid-feedback" th:errors="*{name}"></div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Danh mục *</label>
+            <select class="form-select" name="categoryId" th:classappend="${categoryError} ? 'is-invalid'">
+                <option value="">-- Chọn danh mục --</option>
+                <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}"
+                        th:selected="${c.id == selectedCategoryId}"></option>
+            </select>
+            <div class="invalid-feedback" th:text="${categoryError}"></div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Giá (₫) *</label>
+                <input type="number" step="1000" min="0" class="form-control" th:field="*{price}" th:errorclass="is-invalid">
+                <div class="invalid-feedback" th:errors="*{price}"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Số lượng tồn *</label>
+                <input type="number" min="0" class="form-control" th:field="*{quantity}" th:errorclass="is-invalid">
+                <div class="invalid-feedback" th:errors="*{quantity}"></div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">URL hình ảnh</label>
+            <input class="form-control" th:field="*{imageUrl}" placeholder="https://... hoặc /images/products/a.jpg">
+            <img th:if="*{imageUrl}" th:src="*{imageUrl}" class="mt-2 rounded border" style="max-height:150px" alt="">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Mô tả</label>
+            <textarea class="form-control" rows="3" th:field="*{description}" th:errorclass="is-invalid"></textarea>
+            <div class="invalid-feedback" th:errors="*{description}"></div>
+        </div>
+
+        <button class="btn btn-primary">Lưu</button>
+        <a class="btn btn-secondary" th:href="@{/admin/products}">Huỷ</a>
+    </form>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Tài khoản')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container" style="max-width:640px">
+    <h3 th:text="${userForm.id == null} ? 'Thêm tài khoản' : 'Sửa tài khoản'"></h3>
+    <form th:action="@{/admin/users/save}" th:object="${userForm}" method="post">
+        <div th:if="${#fields.hasGlobalErrors()}" class="alert alert-danger" th:errors="*{global}"></div>
+        <input type="hidden" th:field="*{id}">
+
+        <div class="mb-2">
+            <label class="form-label">Tên đăng nhập *</label>
+            <input class="form-control" th:field="*{username}" th:readonly="*{id != null}" th:errorclass="is-invalid">
+            <div class="invalid-feedback" th:errors="*{username}"></div>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Mật khẩu <small class="text-muted" th:if="*{id != null}">(để trống nếu không đổi)</small></label>
+            <input type="password" class="form-control" th:field="*{password}">
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Họ tên *</label>
+            <input class="form-control" th:field="*{fullName}" th:errorclass="is-invalid">
+            <div class="invalid-feedback" th:errors="*{fullName}"></div>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Email *</label>
+            <input class="form-control" th:field="*{email}" th:errorclass="is-invalid">
+            <div class="invalid-feedback" th:errors="*{email}"></div>
+        </div>
+        <div class="row">
+            <div class="col mb-2"><label class="form-label">SĐT</label><input class="form-control" th:field="*{phone}"></div>
+            <div class="col mb-2">
+                <label class="form-label">Vai trò</label>
+                <select class="form-select" th:field="*{role}">
+                    <option th:each="r : ${roles}" th:value="${r}" th:text="${r}"></option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-2"><label class="form-label">Địa chỉ</label><input class="form-control" th:field="*{address}"></div>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" th:field="*{enabled}" id="en">
+            <label class="form-check-label" for="en">Đang hoạt động (bỏ tick = khoá tài khoản)</label>
+        </div>
+        <button class="btn btn-primary">Lưu</button>
+        <a class="btn btn-secondary" th:href="@{/admin/users}">Huỷ</a>
+    </form>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

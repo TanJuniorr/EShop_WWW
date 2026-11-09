@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Đơn hàng')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+    <h3>Đơn hàng #<span th:text="${order.id}"></span>
+        <span class="badge bg-info text-dark" th:text="${order.status}"></span></h3>
+    <p>
+        Ngày đặt: <span th:text="${#temporals.format(order.orderDate, 'dd/MM/yyyy HH:mm')}"></span><br>
+        Người nhận: <b th:text="${order.customerName}"></b> – <span th:text="${order.phone}"></span><br>
+        Địa chỉ: <span th:text="${order.address}"></span><br>
+        Thanh toán: <span th:text="${order.paymentMethod}"></span>
+    </p>
+    <table class="table">
+        <thead><tr><th>Sản phẩm</th><th class="text-end">Đơn giá</th><th class="text-end">SL</th><th class="text-end">Thành tiền</th></tr></thead>
+        <tbody>
+        <tr th:each="d : ${order.details}">
+            <td th:text="${d.product.name}"></td>
+            <td class="text-end" th:text="${#numbers.formatDecimal(d.unitPrice, 0, 'POINT', 0, 'COMMA')}"></td>
+            <td class="text-end" th:text="${d.quantity}"></td>
+            <td class="text-end" th:text="${#numbers.formatDecimal(d.subtotal, 0, 'POINT', 0, 'COMMA')}"></td>
+        </tr>
+        </tbody>
+        <tfoot><tr><th colspan="3" class="text-end">Tổng</th>
+            <th class="text-end price" th:text="${#numbers.formatDecimal(order.totalAmount, 0, 'POINT', 0, 'COMMA')} + ' ₫'"></th></tr></tfoot>
+    </table>
+    <a th:if="${order.paymentMethod.name() == 'BANKING' and order.status.name() == 'NEW'}"
+       class="btn btn-warning" th:href="@{/orders/{id}/payment(id=${order.id})}">Thanh toán ngay</a>
+    <a class="btn btn-primary" th:href="@{/products}">Tiếp tục mua sắm</a>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

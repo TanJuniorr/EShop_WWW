@@ -1,0 +1,16 @@
+# IntelliJ settings for a local machine
+.idea/
+*.iml
+
+# Maven build
+/target/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+
+# Local secrets and run configs
+.env
+.env.*
+!.env.example
+application-local.properties

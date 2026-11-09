@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Thanh toán')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container">
+    <h3>Thanh toán</h3>
+    <div class="row g-4">
+        <div class="col-md-7">
+            <form th:action="@{/checkout}" th:object="${form}" method="post">
+                <div class="mb-3">
+                    <label class="form-label">Họ tên người nhận *</label>
+                    <input class="form-control" th:field="*{customerName}" th:errorclass="is-invalid">
+                    <div class="invalid-feedback" th:errors="*{customerName}"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Số điện thoại *</label>
+                    <input class="form-control" th:field="*{phone}" th:errorclass="is-invalid">
+                    <div class="invalid-feedback" th:errors="*{phone}"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Địa chỉ giao hàng *</label>
+                    <input class="form-control" th:field="*{address}" th:errorclass="is-invalid">
+                    <div class="invalid-feedback" th:errors="*{address}"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Ghi chú</label>
+                    <textarea class="form-control" rows="2" th:field="*{note}"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label d-block">Phương thức thanh toán *</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" th:field="*{paymentMethod}" value="COD" id="pmCod">
+                        <label class="form-check-label" for="pmCod">Thanh toán khi nhận hàng (COD)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" th:field="*{paymentMethod}" value="BANKING" id="pmBank">
+                        <label class="form-check-label" for="pmBank">Chuyển khoản ngân hàng (giả lập)</label>
+                    </div>
+                </div>
+                <button class="btn btn-success btn-lg">Đặt hàng</button>
+                <a class="btn btn-link" th:href="@{/cart}">← Quay lại giỏ</a>
+            </form>
+        </div>
+
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header">Đơn hàng của bạn</div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between" th:each="i : ${cart.items}">
+                        <span><span th:text="${i.name}"></span> × <b th:text="${i.quantity}"></b></span>
+                        <span th:text="${#numbers.formatDecimal(i.subtotal, 0, 'POINT', 0, 'COMMA')} + ' ₫'"></span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between fw-bold">
+                        <span>Tổng cộng</span>
+                        <span class="price" th:text="${#numbers.formatDecimal(cart.totalAmount, 0, 'POINT', 0, 'COMMA')} + ' ₫'"></span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
