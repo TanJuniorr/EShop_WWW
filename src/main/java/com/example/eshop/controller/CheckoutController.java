@@ -7,6 +7,8 @@ import com.example.eshop.entity.PaymentMethod;
 import com.example.eshop.entity.User;
 import com.example.eshop.service.OrderService;
 import com.example.eshop.service.UserService;
+import com.example.eshop.service.tracking.TrackingService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -25,6 +27,7 @@ public class CheckoutController {
     private final Cart cart;
     private final OrderService orderService;
     private final UserService userService;
+    private final TrackingService tracking;
 
     @GetMapping
     public String form(Model model, Principal principal) {
@@ -41,13 +44,15 @@ public class CheckoutController {
 
     @PostMapping
     public String submit(@Valid @ModelAttribute("form") CheckoutForm form, BindingResult result,
-                         Model model, RedirectAttributes ra, Principal principal) {
+                         Model model, RedirectAttributes ra, Principal principal, HttpServletRequest request) {
         if (result.hasErrors()) {
             model.addAttribute("cart", cart);
             return "checkout/form";
         }
         try {
+            var capture = tracking.capture(request);
             Order order = orderService.placeOrder(form, cart, principal.getName());
+            tracking.placed(capture, order.getId());
             cart.clear();
             if (order.getPaymentMethod() == PaymentMethod.BANKING) {
                 return "redirect:/orders/" + order.getId() + "/payment";

@@ -6,6 +6,7 @@ import com.example.eshop.exception.NotFoundException;
 import com.example.eshop.repository.CategoryRepository;
 import com.example.eshop.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,7 +14,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -21,12 +21,12 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ApplicationEventPublisher events;
 
-    public Page<Product> search(String keyword, Long categoryId, int page, int size) {
-        String kw = StringUtils.hasText(keyword) ? keyword.trim() : null;
+    public Page<Product> list(Long categoryId, int page, int size) {
         // Chặn size <= 0 (làm PageRequest ném lỗi) và size quá lớn từ API công khai.
         int safeSize = Math.max(1, Math.min(size, 100));
-        return productRepository.search(kw, categoryId,
+        return productRepository.listByCategory(categoryId,
                 PageRequest.of(Math.max(page, 0), safeSize, Sort.by("id").descending()));
     }
 
@@ -41,13 +41,18 @@ public class ProductService {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy danh mục id = " + categoryId));
         product.setCategory(category);
-        return productRepository.save(product);   // id == null → INSERT, id != null → UPDATE
+        Product saved = productRepository.save(product);
+        events.publishEvent(new CatalogIndexChange.ProductChanged(saved.getId()));
+        return saved;
     }
 
     @PreAuthorize("hasRole('SELLER')")
+    @Transactional
     public void delete(Long id) {
         try {
             productRepository.deleteById(id);
+            productRepository.flush();
+            events.publishEvent(new CatalogIndexChange.ProductChanged(id));
         } catch (DataIntegrityViolationException e) {
             // vướng khoá ngoại order_detail.product_id
             throw new IllegalStateException("Sản phẩm đã có trong đơn hàng, không thể xoá");

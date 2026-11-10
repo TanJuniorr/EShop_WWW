@@ -1,0 +1,19 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="consent">
+    <div th:if="${trackingEnabled and _csrf != null}" id="tracking-settings"
+         th:attr="data-consent=${trackingConsent},data-consent-url=@{/tracking/consent},data-events-url=@{/tracking/events},
+                  data-csrf-header=${_csrf.headerName},data-csrf-token=${_csrf.token}">
+        <button type="button" id="tracking-preferences" class="btn btn-link btn-sm"
+                aria-controls="tracking-banner" aria-expanded="false">Tùy chọn thống kê</button>
+        <section id="tracking-banner" class="tracking-banner shadow text-start" aria-labelledby="tracking-title" hidden>
+            <h2 id="tracking-title" class="h6">Thống kê sử dụng eShop</h2>
+            <p>Cho phép eShop ghi lượt xem, tìm kiếm và thao tác mua sắm để cải thiện cửa hàng.
+                Bạn có thể đổi lựa chọn trong phiên này.</p>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-primary btn-sm" data-tracking-choice="yes">Đồng ý</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-tracking-choice="no">Từ chối</button>
+            </div>
+            <p id="tracking-status" class="text-danger mb-0 mt-2" role="status"></p>
+        </section>
+        <script th:src="@{/js/tracking.js}" defer></script>
+    </div>
+</th:block>

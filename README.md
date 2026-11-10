@@ -1,8 +1,4 @@
 # eShop – Shopping Cart (Spring Boot, Maven, MariaDB)
-
-Project đã được rà soát theo tài liệu **huong-dan-eshop-spring-boot-maven.pdf** (81 trang).
-Bao gồm cả ba phần: CRUD với Thymeleaf, giỏ hàng/đơn hàng, Spring Security/JWT và ba vai trò.
-
 ## Yêu cầu
 
 - JDK **17**, Maven **3.9.x** (hoặc Maven tích hợp IntelliJ), IntelliJ IDEA, MariaDB **10.6+**.
@@ -54,6 +50,12 @@ mvn spring-boot:run
 - Truy cập `http://localhost:8080`.
 - Nếu port 8080 đã được dùng, chỉnh `server.port` trong `application.properties`.
 
+Trang `/products` dùng tìm kiếm AI khi chạy với profile `ai-dev`. Xem [cách cấu hình Gemini và Qdrant](docs/PHASE5_REPORT.md#api-giao-diện-và-cách-chạy).
+
+Nút **Trợ lý AI** mở chatbot tư vấn sản phẩm, ngân sách và so sánh mẫu. Xem [cách bật và sử dụng chatbot](docs/PHASE6_CHATBOT_REPORT.md).
+
+Analytics dành cho SELLER nằm ở `/admin/analytics`. Bật thu thập sau khi áp dụng migration V007. [Hướng dẫn triển khai và kiểm tra tracking](docs/PHASE7_USER_TRACKING_REPORT.md)
+
 ### Tài khoản demo (mật khẩu `123456`)
 
 | Tên đăng nhập | Quyền |
@@ -64,13 +66,10 @@ mvn spring-boot:run
 
 ### REST API
 
-- `GET /api/products` – công khai.
+- `GET /api/products` – danh sách công khai, hỗ trợ `categoryId`, `page` và `size`.
+- `GET /api/products/semantic-search?q=...` – tìm kiếm AI công khai, hỗ trợ `categoryId`.
 - `POST /api/auth/login` JSON `{"username":"seller1","password":"123456"}` → lấy accessToken.
 - `POST/PUT/DELETE /api/products` – dùng header `Authorization: Bearer <token>` của SELLER.
 - Trang web Thymeleaf dùng cookie `ACCESS_TOKEN` HttpOnly; API **không dùng cookie** để xác thực.
 
 **Lưu ý:** Thanh toán ngân hàng/QR trong bài chỉ là **giả lập theo tài liệu PDF**, chưa tích hợp cổng thanh toán thật; chưa sử dụng cho dữ liệu hoặc giao dịch thật.
-
-## Những thay đổi so với ZIP gốc
-
-Chi tiết xem `FIXES.md`. Thay đổi chủ yếu ở cấu hình bí mật, xác thực API, giao dịch đơn hàng và kiểm tra các trạng thái thanh toán/hủy/xóa đơn. Các package, trang HTML, dependencies và chức năng chính từ PDF được giữ lại.

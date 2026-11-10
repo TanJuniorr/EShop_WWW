@@ -1,6 +1,7 @@
 package com.example.eshop.security;
 
 import lombok.RequiredArgsConstructor;
+import com.example.eshop.service.tracking.TrackingService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -28,6 +29,7 @@ public class SecurityConfig {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final TrackingService tracking;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -78,6 +80,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico", "/error", "/403").permitAll()
                 .requestMatchers("/", "/products", "/products/**", "/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/ai/chat").permitAll()
+                .requestMatchers(HttpMethod.GET, "/tracking/consent").permitAll()
+                .requestMatchers(HttpMethod.POST, "/tracking/consent", "/tracking/events").permitAll()
                 .requestMatchers("/register").hasRole("GUEST")
                 .requestMatchers("/admin/**").hasRole("SELLER")
                 .requestMatchers("/cart/**", "/checkout/**", "/orders/**").hasRole("CUSTOMER")
@@ -87,6 +92,7 @@ public class SecurityConfig {
                 .accessDeniedPage("/403"))                                                  // thiếu quyền → /403
             .logout(l -> l
                 .logoutUrl("/logout")                                    // POST /logout (có CSRF)
+                .addLogoutHandler((request, response, authentication) -> tracking.logout(request))
                 .deleteCookies(JwtService.COOKIE_NAME, "JSESSIONID")
                 .invalidateHttpSession(true)                             // xoá luôn giỏ hàng
                 .logoutSuccessUrl("/?logout"))

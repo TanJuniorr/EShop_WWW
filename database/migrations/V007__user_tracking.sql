@@ -1,0 +1,43 @@
+CREATE TABLE IF NOT EXISTS tracking_sessions (
+    id CHAR(36) PRIMARY KEY,
+    user_id BIGINT NULL,
+    started_at DATETIME(6) NOT NULL,
+    last_activity_at DATETIME(6) NOT NULL,
+    ended_at DATETIME(6) NULL,
+    revoked_at DATETIME(6) NULL,
+    INDEX ix_tracking_session_user (user_id),
+    INDEX ix_tracking_session_activity (last_activity_at)
+);
+
+CREATE TABLE IF NOT EXISTS tracking_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_id CHAR(36) NOT NULL UNIQUE,
+    session_id CHAR(36) NOT NULL,
+    event_type VARCHAR(32) NOT NULL,
+    product_id BIGINT NULL,
+    order_id BIGINT NULL,
+    interaction_id CHAR(36) NULL,
+    result_position INT NULL,
+    search_keyword VARCHAR(96) NULL,
+    search_result_count INT NULL,
+    duration_ms INT NULL,
+    search_status VARCHAR(16) NULL,
+    search_mode VARCHAR(16) NULL,
+    category_id BIGINT NULL,
+    min_price DECIMAL(15,2) NULL,
+    max_price DECIMAL(15,2) NULL,
+    min_inclusive BOOLEAN NULL,
+    max_inclusive BOOLEAN NULL,
+    in_stock BOOLEAN NULL,
+    sort_label VARCHAR(32) NULL,
+    quantity INT NULL,
+    page_path VARCHAR(96) NULL,
+    created_at DATETIME(6) NOT NULL,
+    CONSTRAINT fk_tracking_event_session FOREIGN KEY (session_id) REFERENCES tracking_sessions(id) ON DELETE CASCADE,
+    INDEX ix_tracking_event_time (created_at),
+    INDEX ix_tracking_event_type_time (event_type, created_at),
+    INDEX ix_tracking_event_session_type (session_id, event_type, id),
+    INDEX ix_tracking_event_product_time (product_id, created_at),
+    INDEX ix_tracking_event_order_type (order_id, event_type),
+    INDEX ix_tracking_event_interaction_type (interaction_id, event_type)
+);

@@ -5,8 +5,10 @@ import com.example.eshop.exception.NotFoundException;
 import com.example.eshop.repository.CategoryRepository;
 import com.example.eshop.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -16,6 +18,7 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private final ApplicationEventPublisher events;
 
     public List<Category> findAll() {
         return categoryRepository.findAllByOrderByNameAsc();
@@ -27,8 +30,15 @@ public class CategoryService {
     }
 
     @PreAuthorize("hasRole('SELLER')")
+    @Transactional
     public Category save(Category category) {
-        return categoryRepository.save(category);
+        boolean renamed = category.getId() != null && categoryRepository.findById(category.getId())
+                .map(existing -> !existing.getName().equals(category.getName())).orElse(false);
+        Category saved = categoryRepository.save(category);
+        if (renamed) {
+            events.publishEvent(new CatalogIndexChange.CategoryRenamed(saved.getId()));
+        }
+        return saved;
     }
 
     @PreAuthorize("hasRole('SELLER')")
