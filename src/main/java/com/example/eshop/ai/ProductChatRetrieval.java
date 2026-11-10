@@ -1,11 +1,14 @@
 package com.example.eshop.ai;
 
 import com.example.eshop.entity.Product;
+import com.example.eshop.entity.Category;
+import com.example.eshop.repository.CategoryRepository;
 import com.example.eshop.repository.ProductRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -20,7 +23,7 @@ import java.util.stream.Collectors;
 @Profile("ai-dev")
 class ProductChatRetrieval {
     private static final Pattern BUDGET = Pattern.compile(
-            "(?iu)^(?:(?:tôi|toi|mình|minh|em) +)?(?:có|co|ngân sách(?: là)?|ngan sach(?: la)?) +"
+            "(?iu)^(?:(?:tôi|toi|mình|minh|em) +)?(?:có|co|ngân sách(?: là)?|ngan sach(?: la)?|với|voi) +"
                     + "(\\d+(?:[.,]\\d+)*(?: *(?:triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|vnd|đồng|dong|₫|đ))?)"
                     + "(?=[ ,?!]|$)");
     private static final Pattern COMPARE = Pattern.compile(
@@ -38,13 +41,16 @@ class ProductChatRetrieval {
 
     private final ObjectProvider<ProductSemanticSearchService> semantic;
     private final ProductRepository products;
+    private final CategoryRepository categories;
     private final ProductSearchQueryParser parser = new ProductSearchQueryParser();
     private final int maxProducts;
 
     ProductChatRetrieval(ObjectProvider<ProductSemanticSearchService> semantic, ProductRepository products,
+                         CategoryRepository categories,
                          @Value("${eshop.ai.chat.max-products:5}") int maxProducts) {
         this.semantic = semantic;
         this.products = products;
+        this.categories = categories;
         this.maxProducts = Math.max(2, Math.min(5, maxProducts));
     }
 
@@ -76,7 +82,63 @@ class ProductChatRetrieval {
         }
         String query = withBudget(message);
         return query == null ? Result.say("Bạn cho mình biết ngân sách tính bằng đồng, nghìn hay triệu nhé.")
-                : search(query, null, List.of(), Kind.RECOMMEND);
+                : searchCategoryFirst(query, List.of());
+    }
+
+    /** Use MariaDB for clear category/price questions so they do not depend on Gemini or Qdrant. */
+    private Result searchCategoryFirst(String query, List<Long> exclude) {
+        var parsed = parser.parse(query);
+        Category category = findCategory(query);
+        if (category == null) {
+            return search(query, null, exclude, Kind.RECOMMEND);
+        }
+
+        boolean extreme = parsed.order() == ProductSearchQueryParser.Order.PRICE_ASC
+                || parsed.order() == ProductSearchQueryParser.Order.PRICE_DESC;
+        Sort sort = switch (parsed.order()) {
+            case PRICE_DESC -> Sort.by(Sort.Direction.DESC, "price").and(Sort.by(Sort.Direction.DESC, "id"));
+            case PRICE_ASC -> Sort.by("price").and(Sort.by(Sort.Direction.DESC, "id"));
+            case NEWEST -> Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"));
+            default -> Sort.by("price").and(Sort.by(Sort.Direction.DESC, "id"));
+        };
+        var filters = new ProductSemanticSearchService.Filters(category.getId(),
+                parsed.min() == null ? null : parsed.min().amount(), parsed.min() != null && parsed.min().inclusive(),
+                parsed.max() == null ? null : parsed.max().amount(), parsed.max() != null && parsed.max().inclusive(),
+                parsed.inStock(), parsed.order() == ProductSearchQueryParser.Order.RELEVANCE ? null : parsed.order().name());
+        var page = products.searchCatalog(category.getId(), filters.min(), filters.minInclusive(),
+                filters.max(), filters.maxInclusive(), filters.inStock(),
+                PageRequest.of(0, extreme ? 1 : maxProducts, sort));
+        List<Product> matches = page.getContent().stream().filter(p -> !exclude.contains(p.getId())).toList();
+        if (matches.isEmpty()) {
+            return Result.say(EMPTY);
+        }
+        if (extreme) {
+            boolean cheapest = parsed.order() == ProductSearchQueryParser.Order.PRICE_ASC;
+            return new Result(Kind.PRICE_EXTREME, matches,
+                    Context.of(query, category.getId(), filters, matches),
+                    "Đây là mẫu có giá " + (cheapest ? "thấp nhất" : "cao nhất")
+                            + " trong danh mục " + category.getName() + " hiện có ở eShop.");
+        }
+        return new Result(Kind.RECOMMEND, matches, Context.of(query, category.getId(), filters, matches), null);
+    }
+
+    private Category findCategory(String query) {
+        String words = ProductSearchQueryParser.words(query);
+        return categories.findAllByOrderByNameAsc().stream()
+                .filter(category -> categoryAliases(category).stream().anyMatch(alias ->
+                        (" " + words + " ").contains(" " + alias + " ")))
+                .max(Comparator.comparingInt(category -> categoryAliases(category).stream()
+                        .filter(alias -> (" " + words + " ").contains(" " + alias + " "))
+                        .mapToInt(String::length).max().orElse(0)))
+                .orElse(null);
+    }
+
+    private static List<String> categoryAliases(Category category) {
+        String name = ProductSearchQueryParser.words(category.getName());
+        if (name.equals("ban phim chuot")) {
+            return List.of(name, "ban phim", "chuot");
+        }
+        return List.of(name);
     }
 
     private Result compare(String first, String second) {
@@ -191,7 +253,8 @@ class ProductChatRetrieval {
         if (amount.matches("[\\d.,]+") && !amount.matches("\\d{4,}|\\d{1,3}(?:[.]\\d{3})+")) {
             return null;
         }
-        String rest = message.substring(match.end()).replaceFirst("^[ ,]+", "");
+        String rest = message.substring(match.end()).replaceFirst("^[ ,]+", "")
+                .replaceFirst("(?iu)^(?:có thể mua|co the mua|mua được|mua duoc|mua) +", "");
         if (ProductSearchQueryParser.words(rest).matches("(?:mua (?:duoc )?gi)?")) {
             rest = "";
         }

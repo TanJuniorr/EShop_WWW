@@ -4,6 +4,8 @@ import com.example.eshop.entity.Product;
 import com.example.eshop.repository.CategoryRepository;
 import com.example.eshop.repository.ProductRepository;
 import io.qdrant.client.grpc.Points.ScoredPoint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
@@ -32,6 +34,7 @@ import static io.qdrant.client.ValueFactory.value;
 @Profile("ai-dev")
 @ConditionalOnProperty(name = "eshop.ai.semantic-search.enabled", havingValue = "true", matchIfMissing = true)
 public class ProductSemanticSearchService {
+    private static final Logger LOG = LoggerFactory.getLogger(ProductSemanticSearchService.class);
     private static final Pattern SPACES = Pattern.compile("(?U)\\s+");
     private static final Pattern CATEGORY_PREFIX = Pattern.compile(
             "^(?:(?:toi|minh|em) )?(?:dang tim|muon mua|can mua|can tim|tim mua|tim kiem|tim|liet ke|mua|can|muon|goi y(?: cho (?:toi|minh|em))?) ");
@@ -123,18 +126,23 @@ public class ProductSemanticSearchService {
             if (!reserveRequest()) {
                 throw busy();
             }
+            float[] vector;
+            try {
+                vector = embeddings.embed(parsed.semantic());
+            } catch (RuntimeException failure) {
+                LOG.warn("Semantic search embedding failed ({}).", safeFailureLabel(failure));
+                throw unavailableSearch();
+            }
             List<ScoredPoint> neighbors;
             try {
-                float[] vector = embeddings.embed(parsed.semantic());
                 int limit = parsed.order() == ProductSearchQueryParser.Order.RELEVANCE
                         ? topK * 3 + excludedIds.size() : candidates.size();
                 neighbors = candidates == null
                         ? index.search(vector, limit, threshold, effectiveCategoryId, deadline)
                         : index.search(vector, limit, threshold, effectiveCategoryId, candidates, deadline);
             } catch (RuntimeException failure) {
-                // Do not expose provider diagnostics or silently switch to SQL.
-                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                        "Tìm kiếm AI tạm thời không hoạt động. Vui lòng thử lại sau.");
+                LOG.warn("Semantic search Qdrant request failed ({}).", safeFailureLabel(failure));
+                throw unavailableSearch();
             }
             var ranks = new LinkedHashMap<Long, Float>();
             for (ScoredPoint neighbor : neighbors) {
@@ -229,6 +237,22 @@ public class ProductSemanticSearchService {
 
     private static ResponseStatusException busy() {
         return new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Tìm kiếm AI đang bận. Vui lòng thử lại sau.");
+    }
+
+    private static ResponseStatusException unavailableSearch() {
+        return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "Tìm kiếm AI tạm thời không hoạt động. Vui lòng thử lại sau.");
+    }
+
+    private static String safeFailureLabel(RuntimeException failure) {
+        if (failure instanceof ResponseStatusException status && status.getReason() != null) {
+            return status.getReason();
+        }
+        Throwable cause = failure;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause.getClass().getSimpleName();
     }
 
     public static ResponseStatusException unavailable() {
