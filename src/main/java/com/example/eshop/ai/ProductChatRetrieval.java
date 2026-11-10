@@ -55,6 +55,10 @@ class ProductChatRetrieval {
         }
 
         String words = ProductSearchQueryParser.words(message);
+        String brand = CatalogRequirements.followUpBrand(words);
+        if (brand != null) {
+            return refineBrand(brand, previous);
+        }
         if (ALTERNATIVE.matcher(words).matches() || words.matches("(?:co )?re hon(?: khong)?")) {
             return previous == null ? Result.say(NEED_REFERENCE) : alternatives(words, previous);
         }
@@ -65,7 +69,8 @@ class ProductChatRetrieval {
         var lookup = LOOKUP.matcher(message);
         if (lookup.matches()) {
             String name = lookup.group(1) == null ? lookup.group(2) : lookup.group(1);
-            if (parser.parse(name).hasConstraints()) {
+            var requirements = CatalogRequirements.parse(ProductSearchQueryParser.words(name));
+            if (parser.parse(name).hasConstraints() || requirements.chip() != null || requirements.brand() != null) {
                 return search(name, null, List.of(), Kind.RECOMMEND);
             }
             var matches = namedProducts(name);
@@ -77,6 +82,21 @@ class ProductChatRetrieval {
         String query = withBudget(message);
         return query == null ? Result.say("Bạn cho mình biết ngân sách tính bằng đồng, nghìn hay triệu nhé.")
                 : search(query, null, List.of(), Kind.RECOMMEND);
+    }
+
+    private Result refineBrand(String brand, Context previous) {
+        if (previous == null || previous.query() == null) {
+            return Result.say("Bạn muốn tìm loại sản phẩm nào của hãng này?");
+        }
+        Long category = previous.filters() == null ? previous.explicitCategory() : previous.filters().categoryId();
+        if (category == null) {
+            var categories = liveProducts(previous).stream().map(product -> product.getCategory().getId()).distinct().toList();
+            if (categories.size() != 1) {
+                return Result.say("Bạn muốn tìm loại sản phẩm nào của hãng này?");
+            }
+            category = categories.get(0);
+        }
+        return search(previous.query(), category, List.of(), Kind.RECOMMEND, brand);
     }
 
     private Result compare(String first, String second) {
@@ -155,7 +175,8 @@ class ProductChatRetrieval {
         if (stock) {
             query += " còn hàng";
         }
-        return search(query, category, stock ? List.of() : previous.ids(), Kind.ALTERNATIVE);
+        String brand = previous.filters() == null ? null : previous.filters().requirements().brand();
+        return search(query, category, stock ? List.of() : previous.ids(), Kind.ALTERNATIVE, brand);
     }
 
     private List<Product> liveProducts(Context previous) {
@@ -165,6 +186,10 @@ class ProductChatRetrieval {
     }
 
     private Result search(String query, Long category, List<Long> exclude, Kind kind) {
+        return search(query, category, exclude, kind, null);
+    }
+
+    private Result search(String query, Long category, List<Long> exclude, Kind kind, String brand) {
         var search = semantic.getIfAvailable();
         if (search == null) {
             throw ProductSemanticSearchService.unavailable();
@@ -172,14 +197,14 @@ class ProductChatRetrieval {
         if (query.length() > search.maxLength()) {
             return Result.say("Bạn rút gọn mô tả nhu cầu để mình tiếp tục tìm sản phẩm nhé.");
         }
-        var result = search.search(query, category, 0, exclude);
+        var result = search.search(query, category, 0, exclude, brand);
         var matches = result.hits().stream().map(ProductSemanticSearchService.Hit::product)
                 .filter(p -> !exclude.contains(p.getId()) && result.filters().matches(p))
                 .limit(maxProducts).toList();
-        if (matches.isEmpty()) {
-            return Result.say(EMPTY);
-        }
-        return new Result(kind, matches, Context.of(query, category, result.filters(), matches), null);
+        var context = Context.of(query, category, result.filters(), matches);
+        return matches.isEmpty()
+                ? (brand == null ? Result.say(EMPTY) : new Result(null, matches, context, EMPTY))
+                : new Result(kind, matches, context, null);
     }
 
     private static String withBudget(String message) {

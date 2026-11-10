@@ -25,7 +25,7 @@ final class ProductSearchQueryParser {
     private static final Pattern EXACT = Pattern.compile(START + "(" + PRICE_PREFIX + ")?" + NUMBER + " *" + UNIT + END);
     private static final Pattern GROUPED = Pattern.compile("\\d{1,3}(?:[.]\\d{3})+");
     private static final Pattern STOCK = Pattern.compile("(?<!khong )(?<!het )\\b(?:dang +)?(?:con hang|co san)\\b");
-    private static final Pattern SORT = Pattern.compile("\\b(?:sap xep (?:theo )?)?"
+    private static final Pattern SORT = Pattern.compile("\\b(?:sap xep (?:theo )?|co (?=gia ))?"
             + "(gia tu thap den cao|gia tu cao den thap|tu thap den cao|tu cao den thap|"
             + "gia tang dan|gia giam dan|gia thap nhat|gia cao nhat|gia re nhat|gia dat nhat|re nhat|dat nhat|moi nhat)\\b");
     private static final Pattern GENERIC = Pattern.compile(

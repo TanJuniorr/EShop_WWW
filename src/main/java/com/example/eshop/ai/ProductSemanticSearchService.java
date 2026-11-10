@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,8 +35,10 @@ import static io.qdrant.client.ValueFactory.value;
 public class ProductSemanticSearchService {
     private static final Pattern SPACES = Pattern.compile("(?U)\\s+");
     private static final Pattern CATEGORY_PREFIX = Pattern.compile(
-            "^(?:(?:toi|minh|em) )?(?:dang tim|muon mua|can mua|can tim|tim mua|tim kiem|tim|liet ke|mua|can|muon|goi y(?: cho (?:toi|minh|em))?) ");
+            "^(?:cho (?:toi|tui|minh|em)(?: xem)?|(?:(?:toi|tui|minh|em) )?"
+                    + "(?:dang tim|muon mua|can mua|can tim|tim mua|tim kiem|tim|liet ke|mua|can|muon|goi y(?: cho (?:toi|tui|minh|em))?)) ");
     private static final Pattern CATEGORY_COMPARISON = Pattern.compile("^(?:va|hoac|hay|so voi|vs) ");
+    private static final int CATALOG_PAGE_SIZE = 12;
     private static final long MINUTE = Duration.ofMinutes(1).toNanos();
     private final ProductEmbeddingService embeddings;
     private final QdrantProductIndex index;
@@ -87,31 +90,55 @@ public class ProductSemanticSearchService {
     }
 
     SearchResult search(String rawQuery, Long categoryId, int page, Collection<Long> excludedIds) {
+        return search(rawQuery, categoryId, page, excludedIds, null);
+    }
+
+    SearchResult search(String rawQuery, Long categoryId, int page, Collection<Long> excludedIds, String brand) {
         String query = normalize(rawQuery);
         if (categoryId != null && categoryId <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Danh mục tìm kiếm không hợp lệ.");
         }
         var parsed = parser.parse(query);
-        var inferred = categoryId == null && !parsed.semantic().isEmpty() ? inferCategory(parsed.semantic()) : null;
-        Long effectiveCategoryId = inferred == null ? categoryId : inferred.id();
+        var parsedRequirements = CatalogRequirements.parse(categorySubject(parsed.semantic()));
+        var requirements = brand == null ? parsedRequirements : parsedRequirements.withBrand(brand);
+        String subject = requirements.remaining();
+        String categorySubject = requirements.phoneModel() == null ? subject : "dien thoai";
+        var inferred = (categoryId == null || requirements.present()) && !categorySubject.isEmpty()
+                ? inferCategory(categorySubject) : null;
+        Long effectiveCategoryId = categoryId != null || inferred == null ? categoryId : inferred.id();
         var filters = new Filters(effectiveCategoryId,
                 parsed.min() == null ? null : parsed.min().amount(), parsed.min() != null && parsed.min().inclusive(),
                 parsed.max() == null ? null : parsed.max().amount(), parsed.max() != null && parsed.max().inclusive(),
-                parsed.inStock(), orderLabel(parsed.order()));
+                parsed.inStock(), orderLabel(parsed.order()), requirements);
 
-        if (parsed.semantic().isEmpty() || (inferred != null && categorySubject(parsed.semantic()).equals(inferred.words()))) {
+        boolean categoryOnly = inferred != null && subject.equals(inferred.words());
+        if (!requirements.present() && (parsed.semantic().isEmpty() || categoryOnly)) {
             var result = products.searchCatalog(filters.categoryId(), filters.min(), filters.minInclusive(),
                     filters.max(), filters.maxInclusive(), filters.inStock(),
-                    PageRequest.of(Math.max(0, page), 12, catalogSort(parsed.order())));
+                    PageRequest.of(Math.max(0, page), CATALOG_PAGE_SIZE, catalogSort(parsed.order())));
             return new SearchResult(result.getContent().stream().map(product -> new Hit(product, null)).toList(),
                     SearchMode.FILTERS, filters, result.getTotalElements(), result.getNumber(), result.getTotalPages());
         }
 
         // Filter before ranking, so eligible products outside the unrestricted top K are still considered.
-        List<Long> candidates = parsed.hasConstraints()
-                ? products.hybridCandidateIds(filters.categoryId(), filters.min(), filters.minInclusive(),
-                        filters.max(), filters.maxInclusive(), filters.inStock())
-                : null;
+        List<Long> candidates;
+        if (requirements.present()) {
+            if (inferred != null && !inferred.id().equals(effectiveCategoryId)) {
+                return requirementPage(List.of(), filters, page);
+            }
+            var matches = products.searchCatalog(filters.categoryId(), filters.min(), filters.minInclusive(),
+                            filters.max(), filters.maxInclusive(), filters.inStock(), Pageable.unpaged(catalogSort(parsed.order())))
+                    .stream().filter(filters::matches).filter(product -> !excludedIds.contains(product.getId())).toList();
+            if (matches.isEmpty() || subject.isEmpty() || categoryOnly) {
+                return requirementPage(matches, filters, page);
+            }
+            candidates = matches.stream().map(Product::getId).toList();
+        } else {
+            candidates = parsed.hasConstraints()
+                    ? products.hybridCandidateIds(filters.categoryId(), filters.min(), filters.minInclusive(),
+                            filters.max(), filters.maxInclusive(), filters.inStock())
+                    : null;
+        }
         SearchMode mode = candidates != null || effectiveCategoryId != null ? SearchMode.HYBRID : SearchMode.VECTOR;
         if (candidates != null && candidates.isEmpty()) {
             return new SearchResult(List.of(), SearchMode.FILTERS, filters, 0, 0, 1);
@@ -161,10 +188,18 @@ public class ProductSemanticSearchService {
         }
     }
 
-    private CategoryName inferCategory(String query) {
+    private static SearchResult requirementPage(List<Product> matches, Filters filters, int page) {
+        int pageNumber = Math.max(0, page);
+        int start = (int) Math.min((long) pageNumber * CATALOG_PAGE_SIZE, matches.size());
+        int end = start + Math.min(CATALOG_PAGE_SIZE, matches.size() - start);
+        var hits = matches.subList(start, end).stream().map(product -> new Hit(product, null)).toList();
+        int pages = (int) Math.ceil((double) matches.size() / CATALOG_PAGE_SIZE);
+        return new SearchResult(hits, SearchMode.FILTERS, filters, matches.size(), pageNumber, pages);
+    }
+
+    private CategoryName inferCategory(String subject) {
         // Only narrow when the requested product type leads the query. "Chuột cho laptop"
         // targets mice, whereas "phụ kiện cho điện thoại" must not be narrowed to phones.
-        String subject = categorySubject(query);
         var catalog = categories.findAllByOrderByNameAsc().stream()
                 .map(category -> new CategoryName(category.getId(), ProductSearchQueryParser.words(category.getName())))
                 .filter(category -> !category.words().isEmpty())
@@ -267,7 +302,8 @@ public class ProductSemanticSearchService {
     public enum SearchMode { FILTERS, VECTOR, HYBRID }
 
     public record Filters(Long categoryId, BigDecimal min, boolean minInclusive,
-                          BigDecimal max, boolean maxInclusive, boolean inStock, String orderLabel) {
+                          BigDecimal max, boolean maxInclusive, boolean inStock, String orderLabel,
+                          CatalogRequirements requirements) {
         boolean matches(Product product) {
             if ((categoryId != null && !Objects.equals(categoryId, product.getCategory().getId()))
                     || (inStock && product.getQuantity() <= 0)) {
@@ -276,7 +312,7 @@ public class ProductSemanticSearchService {
             int lower = min == null ? 1 : product.getPrice().compareTo(min);
             int upper = max == null ? -1 : product.getPrice().compareTo(max);
             return (lower > 0 || lower == 0 && minInclusive)
-                    && (upper < 0 || upper == 0 && maxInclusive);
+                    && (upper < 0 || upper == 0 && maxInclusive) && requirements.matches(product);
         }
     }
 

@@ -36,6 +36,8 @@ import static io.qdrant.client.ValueFactory.value;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -67,6 +69,7 @@ class AiChatWebTest {
     @Autowired private WebApplicationContext context;
     @Autowired private ProductRepository products;
     @Autowired private CategoryRepository categories;
+    @Autowired private ProductChatRetrieval retrieval;
     @MockitoBean private ChatModel model;
     @MockitoBean private ProductEmbeddingService embeddings;
     @MockitoBean private QdrantProductIndex index;
@@ -153,6 +156,104 @@ class AiChatWebTest {
                 .andExpect(jsonPath("$.products[0].price").value(999_999))
                 .andExpect(jsonPath("$.products[1].price").value(3_000_000));
         verifyNoInteractions(embeddings, index);
+    }
+
+    @Test
+    void exactChipSearchChecksCatalogAndExcludesOtherPhonesAndAccessories() throws Exception {
+        var phones = iphone.getCategory();
+        product(phones, "OPPO Reno11 F 5G", 8_990_000, 2, "Chip Dimensity 7050. So sánh hiệu năng với A16 Bionic.");
+        product(phones, "Samsung Galaxy A16", 5_000_000, 2, null);
+        product(phones, "Điện thoại mã gần giống", 7_000_000, 2, "Chip A160");
+        var accessories = category("Sạc và cáp");
+        product(accessories, "Củ sạc Anker 20W", 290_000, 5, "Tương thích với điện thoại dùng chip A16");
+
+        String query = "điện thoại có chip A16";
+        chat(session, null, query).andExpect(status().isOk())
+                .andExpect(jsonPath("$.products.length()").value(1))
+                .andExpect(jsonPath("$.products[0].id").value(iphone.getId().intValue()));
+        chat(session, null, "Có điện thoại dùng chip Apple A16 Bionic không?").andExpect(status().isOk())
+                .andExpect(jsonPath("$.products.length()").value(1))
+                .andExpect(jsonPath("$.products[0].id").value(iphone.getId().intValue()));
+        mvc.perform(get("/api/products/semantic-search").param("q", "Điện thoại chip A16 dưới 20 triệu"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+        mvc.perform(get("/api/products/semantic-search").param("q", "Điện thoại có chip A99"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+        mvc.perform(get("/products").param("keyword", query))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("iPhone 15 128GB")))
+                .andExpect(content().string(not(containsString("OPPO Reno11 F 5G"))))
+                .andExpect(content().string(not(containsString("Củ sạc Anker 20W"))));
+        mvc.perform(get("/api/products/semantic-search").param("q", query))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(iphone.getId().intValue()));
+        mvc.perform(get("/api/products/semantic-search").param("q", query)
+                        .param("categoryId", accessories.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        verifyNoInteractions(embeddings, index);
+    }
+
+    @Test
+    void explicitIphoneFamilyExcludesOtherPhoneLinesAndAccessories() throws Exception {
+        var second = product(iphone.getCategory(), "iPhone 14 128GB", 15_000_000, 2, "Chip A15 Bionic");
+        product(category("Ốp lưng"), "iPhone 15 case", 300_000, 4, null);
+        mvc.perform(get("/api/products/semantic-search").param("q", "Cho tôi các điện thoại thuộc dòng iPhone"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(second.getId().intValue()))
+                .andExpect(jsonPath("$[1].id").value(iphone.getId().intValue()));
+        verifyNoInteractions(embeddings, index);
+    }
+
+    @Test
+    void brandFollowUpKeepsPhoneCategoryAndSortsAcrossTheWholeCatalog() throws Exception {
+        var phones = iphone.getCategory();
+        var cheapest = product(phones, "OPPO A1", 2_000_000, 4, "Có phụ kiện tương thích Samsung");
+        product(phones, "OPPO A2", 3_500_000, 3, null);
+        product(phones, "Xiaomi A3", 4_000_000, 3, null);
+        var cheaperSamsung = product(phones, "Samsung Galaxy A55", 7_000_000, 4, null);
+        product(category("Đồng hồ thông minh"), "Samsung Galaxy Watch6", 1_000_000, 3, null);
+        product(category("Màn hình"), "Samsung Odyssey G5", 1_500_000, 2, null);
+
+        var first = retrieval.retrieve("tìm điện thoại có giá thấp nhất", null);
+        assertEquals(5, first.products().size());
+        assertEquals(cheapest.getId(), first.products().get(0).getId());
+        assertTrue(first.products().stream().noneMatch(product -> product.getName().startsWith("Samsung")));
+
+        var refined = retrieval.retrieve("nhưng của hãng Samsung", first.context());
+        assertEquals(List.of(cheaperSamsung.getId(), samsung.getId()), ids(refined));
+        assertEquals(List.of(cheapest.getId()), ids(retrieval.retrieve("OPPO thì sao?", refined.context())).subList(0, 1));
+
+        var noMatch = retrieval.retrieve("nhưng của hãng Unknown", refined.context());
+        assertTrue(noMatch.products().isEmpty());
+        assertEquals(List.of(cheaperSamsung.getId(), samsung.getId()),
+                ids(retrieval.retrieve("Samsung thì sao?", noMatch.context())));
+        assertTrue(retrieval.retrieve("nhưng của hãng Samsung", null).message().contains("loại sản phẩm"));
+
+        mvc.perform(get("/api/products/semantic-search").param("q", "Điện thoại Samsung có giá thấp nhất"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(cheaperSamsung.getId().intValue()))
+                .andExpect(jsonPath("$[1].id").value(samsung.getId().intValue()));
+        verifyNoInteractions(embeddings, index);
+    }
+
+    private static List<Long> ids(ProductChatRetrieval.Result result) {
+        return result.products().stream().map(Product::getId).toList();
+    }
+
+    @Test
+    void mixedSearchRanksOnlyProductsVerifiedForTheRequestedChip() throws Exception {
+        String query = "Điện thoại có chip A16 chụp ảnh đẹp";
+        var vector = new float[768];
+        when(embeddings.embed(query)).thenReturn(vector);
+        when(index.search(vector, 15, .55f, iphone.getCategory().getId(),
+                List.of(iphone.getId()), Duration.ofSeconds(3)))
+                .thenReturn(List.of(point(samsung.getId()), point(iphone.getId())));
+        chat(session, null, query).andExpect(status().isOk())
+                .andExpect(jsonPath("$.products.length()").value(1))
+                .andExpect(jsonPath("$.products[0].id").value(iphone.getId().intValue()));
     }
 
     @Test
