@@ -11,7 +11,6 @@
     </div>
 
     <form class="row g-2 mb-3" th:action="@{/admin/products}" method="get">
-        <div class="col-md-5"><input class="form-control" name="keyword" th:value="${keyword}" placeholder="Tên sản phẩm"></div>
         <div class="col-md-4">
             <select class="form-select" name="categoryId">
                 <option value="">-- Tất cả danh mục --</option>
@@ -49,7 +48,7 @@
         <ul class="pagination justify-content-center">
             <li class="page-item" th:each="i : ${#numbers.sequence(0, products.totalPages - 1)}"
                 th:classappend="${i == products.number} ? 'active'">
-                <a class="page-link" th:href="@{/admin/products(keyword=${keyword}, categoryId=${categoryId}, page=${i})}"
+                <a class="page-link" th:href="@{/admin/products(categoryId=${categoryId}, page=${i})}"
                    th:text="${i + 1}"></a>
             </li>
         </ul>

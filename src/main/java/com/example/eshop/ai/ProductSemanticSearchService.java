@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Comparator;
+import java.util.Collection;
 import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
@@ -33,7 +34,7 @@ import static io.qdrant.client.ValueFactory.value;
 public class ProductSemanticSearchService {
     private static final Pattern SPACES = Pattern.compile("(?U)\\s+");
     private static final Pattern CATEGORY_PREFIX = Pattern.compile(
-            "^(?:(?:toi|minh|em) )?(?:dang tim|muon mua|can mua|can tim|tim mua|tim|mua|can|muon|goi y(?: cho (?:toi|minh|em))?) ");
+            "^(?:(?:toi|minh|em) )?(?:dang tim|muon mua|can mua|can tim|tim mua|tim kiem|tim|liet ke|mua|can|muon|goi y(?: cho (?:toi|minh|em))?) ");
     private static final Pattern CATEGORY_COMPARISON = Pattern.compile("^(?:va|hoac|hay|so voi|vs) ");
     private static final long MINUTE = Duration.ofMinutes(1).toNanos();
     private final ProductEmbeddingService embeddings;
@@ -82,6 +83,10 @@ public class ProductSemanticSearchService {
     }
 
     public SearchResult search(String rawQuery, Long categoryId, int page) {
+        return search(rawQuery, categoryId, page, List.of());
+    }
+
+    SearchResult search(String rawQuery, Long categoryId, int page, Collection<Long> excludedIds) {
         String query = normalize(rawQuery);
         if (categoryId != null && categoryId <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Danh mục tìm kiếm không hợp lệ.");
@@ -122,19 +127,19 @@ public class ProductSemanticSearchService {
             try {
                 float[] vector = embeddings.embed(parsed.semantic());
                 int limit = parsed.order() == ProductSearchQueryParser.Order.RELEVANCE
-                        ? topK * 3 : candidates.size();
+                        ? topK * 3 + excludedIds.size() : candidates.size();
                 neighbors = candidates == null
                         ? index.search(vector, limit, threshold, effectiveCategoryId, deadline)
                         : index.search(vector, limit, threshold, effectiveCategoryId, candidates, deadline);
             } catch (RuntimeException failure) {
                 // Do not expose provider diagnostics or silently switch to SQL.
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                        "Tìm kiếm AI tạm thời không hoạt động. Bạn có thể thử lại hoặc chọn tìm kiếm thông thường.");
+                        "Tìm kiếm AI tạm thời không hoạt động. Vui lòng thử lại sau.");
             }
             var ranks = new LinkedHashMap<Long, Float>();
             for (ScoredPoint neighbor : neighbors) {
                 long id = neighbor.getPayloadOrDefault("product_id", value(0L)).getIntegerValue();
-                if (id > 0 && Float.isFinite(neighbor.getScore()) && neighbor.getScore() >= threshold) {
+                if (id > 0 && !excludedIds.contains(id) && Float.isFinite(neighbor.getScore()) && neighbor.getScore() >= threshold) {
                     ranks.putIfAbsent(id, neighbor.getScore());
                 }
             }
@@ -188,6 +193,7 @@ public class ProductSemanticSearchService {
 
     private static String categorySubject(String text) {
         return CATEGORY_PREFIX.matcher(ProductSearchQueryParser.words(text)).replaceFirst("")
+                .replaceFirst("^(?:tat ca(?: cac)?|cac|nhung) ", "")
                 .replaceFirst("^san pham ", "");
     }
 

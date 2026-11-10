@@ -94,7 +94,7 @@ public class OrderService {
 
     @PreAuthorize("hasRole('SELLER')")
     @Transactional
-    public void updateStatus(Long id, OrderStatus status) {
+    public boolean updateStatus(Long id, OrderStatus status) {
         Order o = findById(id);
         // Một đơn đã huỷ không được mở lại: nếu không, huỷ lần nữa sẽ cộng tồn kho nhiều lần.
         if (o.getStatus() == OrderStatus.CANCELLED && status != OrderStatus.CANCELLED) {
@@ -104,7 +104,9 @@ public class OrderService {
         if (status == OrderStatus.CANCELLED && o.getStatus() != OrderStatus.CANCELLED) {
             o.getDetails().forEach(d -> d.getProduct().setQuantity(d.getProduct().getQuantity() + d.getQuantity()));
         }
+        boolean completed = status == OrderStatus.DONE && o.getStatus() != OrderStatus.DONE;
         o.setStatus(status);
+        return completed;
     }
 
     @PreAuthorize("hasRole('SELLER')")

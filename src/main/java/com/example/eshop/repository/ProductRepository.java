@@ -17,6 +17,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsByCategoryId(Long categoryId);
 
+    List<Product> findByNameIgnoreCase(String name, Pageable limit);
+
+    List<Product> findByNameStartingWithIgnoreCase(String name, Pageable limit);
+
     String CATALOG_FILTERS = """
             (:categoryId is null or p.category.id = :categoryId)
             and (:min is null or p.price > :min or (:minInclusive = true and p.price = :min))
@@ -61,13 +65,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p FROM Product p WHERE p.id = :id")
     Optional<Product> findByIdForUpdate(@Param("id") Long id);
 
-    /** Tìm theo tên (không phân biệt hoa thường) và/hoặc theo danh mục; tham số null = bỏ qua điều kiện. */
-    @Query("""
-            SELECT p FROM Product p
-            WHERE (:keyword IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
-              AND (:categoryId IS NULL OR p.category.id = :categoryId)
-            """)
-    Page<Product> search(@Param("keyword") String keyword,
-                         @Param("categoryId") Long categoryId,
-                         Pageable pageable);
+    @Query("select p from Product p where (:categoryId is null or p.category.id = :categoryId)")
+    Page<Product> listByCategory(@Param("categoryId") Long categoryId, Pageable pageable);
 }

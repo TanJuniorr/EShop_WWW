@@ -67,6 +67,11 @@ class EshopRegressionTest {
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/products/semantic-search").param("q", "Laptop"))
                 .andExpect(status().isServiceUnavailable());
+        mvc.perform(get("/products")).andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("id=\"shopping-chat\""))));
+        mvc.perform(post("/ai/chat").with(csrf().asHeader()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Xin chào\"}"))
+                .andExpect(status().isServiceUnavailable());
     }
 
     @Test
@@ -100,29 +105,41 @@ class EshopRegressionTest {
     }
 
     @Test
-    void catalogSearchAndSellerProductCrud() throws Exception {
+    void catalogBrowsingAndSellerProductCrud() throws Exception {
         Category category = category("Catalog fixtures");
         Product product = product(category, "Wireless Mouse");
         product(category, "Mechanical Keyboard");
+        product(category("Other catalog fixtures"), "Travel Headphones");
 
-        mvc.perform(get("/products").param("keyword", "LESS M")
-                        .param("categoryId", category.getId().toString()))
+        String categoryId = category.getId().toString();
+        mvc.perform(get("/products").param("categoryId", categoryId).param("keyword", " "))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Wireless Mouse")))
-                .andExpect(content().string(not(containsString("Mechanical Keyboard"))));
+                .andExpect(content().string(containsString("Mechanical Keyboard")))
+                .andExpect(content().string(not(containsString("Travel Headphones"))))
+                .andExpect(content().string(not(containsString("name=\"keyword\""))));
+        mvc.perform(get("/products").param("keyword", "Wireless Mouse").param("categoryId", categoryId))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(content().string(containsString("Tìm kiếm AI chưa được bật.")))
+                .andExpect(content().string(not(containsString("Wireless Mouse"))));
         mvc.perform(get("/products/{id}", product.getId()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Wireless Mouse")));
-        mvc.perform(get("/api/products").param("keyword", "LESS M"))
+        mvc.perform(get("/api/products").param("categoryId", categoryId)
+                        .param("size", "1").param("keyword", "LESS M"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].name").value("Mechanical Keyboard"))
                 .andExpect(jsonPath("$.content[0].categoryName").value(category.getName()));
 
         String password = createUser("catalog_seller", Role.ROLE_SELLER);
         Cookie seller = loginWeb("catalog_seller", password, "/admin/products");
-        mvc.perform(get("/admin/products").cookie(seller))
+        mvc.perform(get("/admin/products").cookie(seller).param("categoryId", categoryId).param("keyword", "LESS M"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("admin/product/list"));
+                .andExpect(view().name("admin/product/list"))
+                .andExpect(content().string(containsString("Mechanical Keyboard")))
+                .andExpect(content().string(not(containsString("name=\"keyword\""))));
         mvc.perform(get("/cart").cookie(seller)).andExpect(status().isForbidden());
 
         String token = loginApi("catalog_seller", password);

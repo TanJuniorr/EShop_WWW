@@ -12,52 +12,39 @@
             <div class="list-group">
                 <a class="list-group-item list-group-item-action"
                    th:classappend="${categoryId == null} ? 'active'"
-                   th:href="@{/products(keyword=${keyword}, mode=${aiMode ? 'ai' : null})}">Tất cả</a>
+                   th:href="@{/products(keyword=${keyword})}">Tất cả</a>
                 <a th:each="c : ${categories}" class="list-group-item list-group-item-action"
                    th:classappend="${c.id == categoryId} ? 'active'"
-                   th:href="@{/products(categoryId=${c.id}, keyword=${keyword}, mode=${aiMode ? 'ai' : null})}" th:text="${c.name}"></a>
+                   th:href="@{/products(categoryId=${c.id}, keyword=${keyword})}" th:text="${c.name}"></a>
             </div>
         </aside>
 
         <!-- Lưới sản phẩm -->
         <section class="col-md-9">
-            <form id="shop-search" class="row g-2 mb-3" method="get" th:action="@{/products}"
-                  th:attr="data-ai-max=${aiMaxLength}">
+            <form th:if="${aiMaxLength != null}" id="shop-search" class="mb-3" method="get" th:action="@{/products}">
                 <input th:if="${categoryId != null}" type="hidden" name="categoryId" th:value="${categoryId}">
-                <div class="col-12 col-lg-4">
-                    <label for="shop-search-mode" class="form-label">Chế độ tìm kiếm</label>
-                    <select id="shop-search-mode" name="mode" class="form-select">
-                        <option value="standard" th:selected="${!aiMode}">Tìm kiếm thông thường</option>
-                        <option th:if="${aiAvailable or aiMode}" value="ai" th:selected="${aiMode}">Tìm kiếm thông minh bằng AI</option>
-                    </select>
+                <label for="shop-search-query" class="form-label">Tìm kiếm AI</label>
+                <div class="input-group">
+                    <input id="shop-search-query" type="search" class="form-control" name="keyword"
+                           th:value="${keyword}" th:maxlength="${aiMaxLength}"
+                           placeholder="Ví dụ: Laptop phù hợp cho sinh viên lập trình">
+                    <button type="submit" class="btn btn-primary">Tìm</button>
                 </div>
-                <div class="col-12 col-lg">
-                    <label for="shop-search-query" class="form-label">Nội dung tìm kiếm</label>
-                    <div class="input-group">
-                        <input id="shop-search-query" type="search" class="form-control" name="keyword"
-                               th:value="${keyword}" th:attr="maxlength=${aiMode ? aiMaxLength : null}"
-                               th:placeholder="${aiMode ? 'Ví dụ: Laptop phù hợp cho sinh viên lập trình' : 'Tên sản phẩm'}">
-                        <button type="submit" class="btn btn-primary">Tìm</button>
-                    </div>
-                </div>
-                <p id="shop-search-loading" class="col-12 text-muted mb-0" role="status" hidden>Đang tìm sản phẩm…</p>
+                <p id="shop-search-loading" class="text-muted mt-2 mb-0" role="status" hidden>Đang tìm sản phẩm…</p>
             </form>
-            <div th:if="${searchError}" class="alert alert-warning" role="alert">
-                <span th:text="${searchError}"></span>
-                <a th:href="@{/products(keyword=${keyword}, categoryId=${categoryId})}" class="alert-link">Tìm kiếm thông thường</a>
-            </div>
+            <div th:if="${searchError}" class="alert alert-warning" role="alert" th:text="${searchError}"></div>
             <p th:unless="${searchError}" class="text-muted">
-                <span th:if="${aiMode}">Tìm kiếm AI · </span>
-                Tìm thấy <b th:text="${resultCount}">0</b> sản phẩm
+                <span th:text="${keyword == null ? 'Có' : 'Tìm thấy'}"></span> <b th:text="${resultCount}">0</b> sản phẩm
                 <span th:if="${keyword}"> cho từ khoá "<b th:text="${keyword}"></b>"</span>
             </p>
-            <p th:if="${searchError == null and resultCount == 0}" class="alert alert-light" role="status">
+            <p th:if="${keyword != null and searchError == null and resultCount == 0}" class="alert alert-light" role="status">
                 Không tìm thấy sản phẩm phù hợp. Hãy thử cách diễn đạt khác hoặc đổi danh mục.
             </p>
             <div class="row row-cols-2 row-cols-lg-3 g-3">
                 <div class="col" th:each="p : ${cards}">
                     <div class="card h-100 shadow-sm">
-                        <a th:href="@{/products/{id}(id=${p.id})}">
+                        <a th:href="@{/products/{id}(id=${p.id})}"
+                           th:attr="data-tracking-offer=${trackingOffer},data-tracking-product=${trackingOffer != null ? p.id : null}">
                             <img class="card-img-top product-img" th:src="${p.imageUrl}" th:alt="${p.name}">
                         </a>
                         <div class="card-body d-flex flex-column">
@@ -72,18 +59,19 @@
                                     <input type="hidden" name="productId" th:value="${p.id}">
                                     <button class="btn btn-sm btn-primary" th:disabled="${p.quantity == 0}">🛒 Thêm vào giỏ</button>
                                 </form>
-                                <a class="btn btn-sm btn-outline-primary" th:href="@{/products/{id}(id=${p.id})}">Chi tiết</a>
+                                <a class="btn btn-sm btn-outline-primary" th:href="@{/products/{id}(id=${p.id})}"
+                                   th:attr="data-tracking-offer=${trackingOffer},data-tracking-product=${trackingOffer != null ? p.id : null}">Chi tiết</a>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <nav class="mt-4" th:if="${!aiMode and products.totalPages > 1}">
+            <nav class="mt-4" th:if="${products != null and products.totalPages > 1}">
                 <ul class="pagination justify-content-center">
                     <li class="page-item" th:each="i : ${#numbers.sequence(0, products.totalPages - 1)}"
                         th:classappend="${i == products.number} ? 'active'">
-                        <a class="page-link" th:href="@{/products(keyword=${keyword}, categoryId=${categoryId}, page=${i})}"
+                        <a class="page-link" th:href="@{/products(categoryId=${categoryId}, page=${i})}"
                            th:text="${i + 1}"></a>
                     </li>
                 </ul>

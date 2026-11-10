@@ -1,0 +1,29 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="widget">
+    <div th:if="${aiChatEnabled and _csrf != null}" id="shopping-chat" class="shopping-chat text-start"
+         th:attr="data-endpoint=@{/ai/chat},data-csrf-header=${_csrf.headerName},data-csrf-token=${_csrf.token}">
+        <button type="button" class="shopping-chat-toggle btn btn-primary shadow"
+                id="shopping-chat-toggle" aria-controls="shopping-chat-panel" aria-expanded="false">
+            <span aria-hidden="true">💬</span> Trợ lý AI
+        </button>
+        <section id="shopping-chat-panel" class="shopping-chat-panel shadow-lg" aria-labelledby="shopping-chat-title" hidden>
+            <header class="shopping-chat-header">
+                <h2 id="shopping-chat-title" class="h6 mb-0"><span aria-hidden="true">💬</span> Trợ lý mua sắm AI</h2>
+                <button type="button" id="shopping-chat-close" class="btn-close btn-close-white" aria-label="Thu nhỏ chat"></button>
+            </header>
+            <div class="shopping-chat-tools">
+                <button type="button" id="shopping-chat-new" class="btn btn-sm btn-outline-primary">Cuộc trò chuyện mới</button>
+            </div>
+            <div id="shopping-chat-log" class="shopping-chat-log" role="log" aria-label="Hội thoại" tabindex="0">
+                <p id="shopping-chat-welcome" class="shopping-chat-bubble">Chào bạn! Hãy cho mình biết bạn cần tìm gì hoặc ngân sách của bạn.</p>
+            </div>
+            <p id="shopping-chat-status" class="shopping-chat-status" role="status"></p>
+            <form id="shopping-chat-form" class="shopping-chat-form">
+                <label for="shopping-chat-message" class="visually-hidden">Tin nhắn cho trợ lý mua sắm</label>
+                <textarea id="shopping-chat-message" class="form-control" rows="2" maxlength="300"
+                          placeholder="Ví dụ: Điện thoại dưới 5 triệu" required></textarea>
+                <button type="submit" class="btn btn-primary">Gửi</button>
+            </form>
+        </section>
+        <script th:src="@{/js/shopping-chat.js}" defer></script>
+    </div>
+</th:block>

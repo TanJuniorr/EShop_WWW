@@ -3,6 +3,8 @@ package com.example.eshop.controller;
 import com.example.eshop.cart.Cart;
 import com.example.eshop.entity.Product;
 import com.example.eshop.service.ProductService;
+import com.example.eshop.tracking.TrackingService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -16,6 +18,7 @@ public class CartController {
 
     private final Cart cart;
     private final ProductService productService;
+    private final TrackingService tracking;
 
     @GetMapping
     public String view(Model model) {
@@ -26,14 +29,16 @@ public class CartController {
     @PostMapping("/add")
     public String add(@RequestParam Long productId,
                       @RequestParam(defaultValue = "1") int quantity,
-                      RedirectAttributes ra) {
+                      RedirectAttributes ra, HttpServletRequest request) {
         Product p = productService.findById(productId);
         int wanted = cart.getQuantityOf(productId) + quantity;
         if (quantity < 1 || wanted > p.getQuantity()) {
             ra.addFlashAttribute("error", "Không đủ hàng: \"" + p.getName() + "\" chỉ còn " + p.getQuantity());
             return "redirect:/products/" + productId;
         }
+        var capture = tracking.capture(request);
         cart.add(p, quantity);
+        tracking.added(capture, productId, quantity);
         ra.addFlashAttribute("message", "Đã thêm \"" + p.getName() + "\" vào giỏ hàng");
         return "redirect:/cart";
     }

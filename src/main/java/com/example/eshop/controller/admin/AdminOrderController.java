@@ -2,6 +2,7 @@ package com.example.eshop.controller.admin;
 
 import com.example.eshop.entity.OrderStatus;
 import com.example.eshop.service.OrderService;
+import com.example.eshop.tracking.TrackingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -14,6 +15,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AdminOrderController {
 
     private final OrderService orderService;
+    private final TrackingService tracking;
 
     @GetMapping
     public String list(Model model) {
@@ -31,7 +33,9 @@ public class AdminOrderController {
     @PostMapping("/{id}/status")
     public String updateStatus(@PathVariable Long id, @RequestParam OrderStatus status, RedirectAttributes ra) {
         try {
-            orderService.updateStatus(id, status);
+            if (orderService.updateStatus(id, status)) {
+                tracking.completed(id);
+            }
             ra.addFlashAttribute("message", "Đã cập nhật trạng thái đơn #" + id);
         } catch (IllegalStateException e) {
             ra.addFlashAttribute("error", e.getMessage());

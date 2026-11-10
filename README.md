@@ -54,6 +54,12 @@ mvn spring-boot:run
 - Truy cập `http://localhost:8080`.
 - Nếu port 8080 đã được dùng, chỉnh `server.port` trong `application.properties`.
 
+Trang `/products` dùng tìm kiếm AI khi chạy với profile `ai-dev`. Xem [cách cấu hình Gemini và Qdrant](docs/PHASE5_REPORT.md#api-giao-diện-và-cách-chạy).
+
+Nút **Trợ lý AI** mở chatbot tư vấn sản phẩm, ngân sách và so sánh mẫu. Xem [cách bật và sử dụng chatbot](docs/PHASE6_CHATBOT_REPORT.md).
+
+Analytics dành cho SELLER nằm ở `/admin/analytics`. Bật thu thập sau khi áp dụng migration V007. [Hướng dẫn triển khai và kiểm tra tracking](docs/PHASE7_USER_TRACKING_REPORT.md)
+
 ### Tài khoản demo (mật khẩu `123456`)
 
 | Tên đăng nhập | Quyền |
@@ -64,7 +70,8 @@ mvn spring-boot:run
 
 ### REST API
 
-- `GET /api/products` – công khai.
+- `GET /api/products` – danh sách công khai, hỗ trợ `categoryId`, `page` và `size`.
+- `GET /api/products/semantic-search?q=...` – tìm kiếm AI công khai, hỗ trợ `categoryId`.
 - `POST /api/auth/login` JSON `{"username":"seller1","password":"123456"}` → lấy accessToken.
 - `POST/PUT/DELETE /api/products` – dùng header `Authorization: Bearer <token>` của SELLER.
 - Trang web Thymeleaf dùng cookie `ACCESS_TOKEN` HttpOnly; API **không dùng cookie** để xác thực.

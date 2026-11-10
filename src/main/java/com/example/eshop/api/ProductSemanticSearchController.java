@@ -39,7 +39,7 @@ class ProductSemanticSearchController {
     }
 
     record ProductMatch(Long id, String name, String description, BigDecimal price, String imageUrl,
-                        Long categoryId, String categoryName, boolean inStock, float score) {
+                        Long categoryId, String categoryName, boolean inStock, Float score) {
         static ProductMatch from(ProductSemanticSearchService.Hit hit) {
             var p = hit.product();
             return new ProductMatch(p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getImageUrl(),

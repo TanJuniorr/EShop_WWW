@@ -20,13 +20,11 @@ public class AdminProductController {
     private final CategoryService categoryService;
 
     @GetMapping
-    public String list(@RequestParam(required = false) String keyword,
-                       @RequestParam(required = false) Long categoryId,
+    public String list(@RequestParam(required = false) Long categoryId,
                        @RequestParam(defaultValue = "0") int page,
                        Model model) {
-        model.addAttribute("products", productService.search(keyword, categoryId, page, 10));
+        model.addAttribute("products", productService.list(categoryId, page, 10));
         model.addAttribute("categories", categoryService.findAll());
-        model.addAttribute("keyword", keyword);
         model.addAttribute("categoryId", categoryId);
         return "admin/product/list";
     }

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Thống kê hành vi')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<main class="container" id="analytics" th:attr="data-endpoint=@{/admin/analytics/data}">
+    <h1 class="h3">Thống kê hành vi</h1>
+    <p class="text-muted">Số liệu từ các phiên đã đồng ý thống kê.</p>
+    <p th:unless="${trackingEnabled}" class="alert alert-warning">Thu thập thống kê đang tắt.</p>
+    <form id="analytics-filters" class="row g-2 align-items-end mb-3">
+        <div class="col-12 col-sm-auto">
+            <label class="form-label" for="analytics-period">Khoảng thời gian</label>
+            <select class="form-select" id="analytics-period">
+                <option value="today">Hôm nay</option>
+                <option value="7" selected>7 ngày</option>
+                <option value="30">30 ngày</option>
+                <option value="custom">Tùy chỉnh</option>
+            </select>
+        </div>
+        <div class="col-12 col-sm-auto" data-analytics-date hidden>
+            <label class="form-label" for="analytics-start">Từ ngày</label>
+            <input type="date" id="analytics-start" class="form-control">
+        </div>
+        <div class="col-12 col-sm-auto" data-analytics-date hidden>
+            <label class="form-label" for="analytics-end">Đến ngày</label>
+            <input type="date" id="analytics-end" class="form-control">
+        </div>
+        <div class="col-12 col-sm-auto"><button class="btn btn-primary" type="submit">Cập nhật</button></div>
+    </form>
+    <p id="analytics-status" class="text-muted" role="status">Đang tải số liệu…</p>
+    <div id="analytics-content" hidden>
+        <p id="analytics-range" class="text-muted small"></p>
+        <div id="analytics-summary" class="row row-cols-2 row-cols-lg-4 g-3 mb-4"></div>
+        <div class="row g-3 mb-4">
+            <section class="col-lg-6">
+                <h2 class="h5">Lượt truy cập theo ngày</h2>
+                <div class="analytics-chart" id="analytics-visits"></div>
+            </section>
+            <section class="col-lg-6">
+                <h2 class="h5">Phễu chuyển đổi theo phiên</h2>
+                <div class="analytics-chart" id="analytics-funnel"></div>
+                <p class="small text-muted mt-2">Mỗi bước chỉ đếm các phiên đã đi qua bước trước theo thứ tự. Bước hoàn tất khớp đúng đơn đã đặt.</p>
+            </section>
+        </div>
+        <section class="mb-4">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h2 class="h5 mb-0">Sản phẩm được quan tâm</h2>
+                <div>
+                    <label class="visually-hidden" for="analytics-sort">Sắp xếp sản phẩm</label>
+                    <select class="form-select" id="analytics-sort">
+                        <option value="VIEWS">Theo lượt xem</option>
+                        <option value="CLICKS">Theo lượt click</option>
+                        <option value="CARTS">Theo lượt thêm giỏ</option>
+                        <option value="SEARCH">Theo click từ AI Search</option>
+                        <option value="CHAT">Theo click từ chatbot</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-responsive mt-2">
+                <table class="table table-striped align-middle">
+                    <thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Xem</th><th>Click</th><th>Thêm giỏ</th><th>Từ AI Search</th><th>Từ chatbot</th></tr></thead>
+                    <tbody id="analytics-products"></tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-end align-items-center gap-2">
+                <button type="button" id="analytics-previous" class="btn btn-sm btn-outline-secondary">Trang trước</button>
+                <span id="analytics-page" class="small"></span>
+                <button type="button" id="analytics-next" class="btn btn-sm btn-outline-secondary">Trang sau</button>
+            </div>
+        </section>
+        <section class="mb-4">
+            <h2 class="h5">AI Search</h2>
+            <div id="analytics-search" class="row row-cols-2 row-cols-lg-4 g-3 mb-3"></div>
+            <div class="row g-3">
+                <div class="col-lg-4"><h3 class="h6">Lượt tìm theo ngày</h3><div class="analytics-chart" id="analytics-search-days"></div></div>
+                <div class="col-lg-4"><h3 class="h6">Click kết quả theo ngày</h3><div class="analytics-chart" id="analytics-search-clicks"></div></div>
+                <div class="col-lg-4"><h3 class="h6">Từ khóa phổ biến</h3><div class="analytics-chart" id="analytics-keywords"></div></div>
+            </div>
+            <h3 class="h6 mt-3">Sản phẩm được bấm nhiều từ AI Search</h3>
+            <div class="analytics-chart" id="analytics-search-products"></div>
+        </section>
+        <section>
+            <h2 class="h5">Chatbot AI</h2>
+            <div id="analytics-chat" class="row row-cols-2 row-cols-lg-4 g-3 mb-3"></div>
+            <h3 class="h6">Sản phẩm được bấm nhiều từ chatbot</h3>
+            <div class="analytics-chart" id="analytics-chat-products"></div>
+        </section>
+    </div>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<script th:src="@{/js/analytics.js}" defer></script>
+</body>
+</html>

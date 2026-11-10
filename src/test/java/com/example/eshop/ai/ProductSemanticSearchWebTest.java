@@ -68,19 +68,23 @@ class ProductSemanticSearchWebTest {
                 .andExpect(jsonPath("$[0].score").value(.9))
                 .andExpect(jsonPath("$[0].vector").doesNotExist())
                 .andExpect(jsonPath("$[1].id").value(first.getId().intValue()));
-        mvc.perform(get("/products").param("mode", "ai").param("keyword", text))
+        mvc.perform(get("/products").param("keyword", text))
                 .andExpect(status().isOk()).andExpect(view().name("shop/index"))
+                .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(content().string(containsString("Tìm kiếm AI")))
+                .andExpect(content().string(containsString("maxlength=\"300\"")))
+                .andExpect(content().string(not(containsString("name=\"mode\""))))
                 .andExpect(content().string(containsString("Máy chuyên lập trình")))
                 .andExpect(content().string(containsString("Hết hàng")));
         mvc.perform(get("/api/products/semantic-search").param("q", " "))
                 .andExpect(status().isBadRequest());
 
-        when(embeddings.embed("Lỗi thử")).thenThrow(new ProductEmbeddingService.ProviderFailure("test", true));
-        mvc.perform(get("/products").param("mode", "ai").param("keyword", "Lỗi thử"))
+        when(embeddings.embed(first.getName())).thenThrow(new ProductEmbeddingService.ProviderFailure("test", true));
+        mvc.perform(get("/products").param("mode", "standard").param("keyword", first.getName()))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(content().string(containsString("Tìm kiếm AI tạm thời không hoạt động")))
-                .andExpect(content().string(not(containsString("Máy phổ thông"))));
+                .andExpect(content().string(not(containsString("Tìm kiếm thông thường"))))
+                .andExpect(content().string(not(containsString("class=\"card h-100 shadow-sm\""))));
     }
 
     @Test
@@ -100,7 +104,7 @@ class ProductSemanticSearchWebTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(phone.getId().intValue()));
-        mvc.perform(get("/products").param("mode", "ai").param("keyword", query))
+        mvc.perform(get("/products").param("keyword", query).param("categoryId", phones.getId().toString()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("iPhone 15")))
                 .andExpect(content().string(not(containsString("Robot hút bụi Xiaomi E10"))));

@@ -6,7 +6,10 @@ import com.google.genai.types.HttpRetryOptions;
 import io.grpc.okhttp.OkHttpChannelBuilder;
 import io.qdrant.client.QdrantClient;
 import io.qdrant.client.QdrantGrpcClient;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.google.genai.GoogleGenAiChatModel;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.google.genai.embedding.GoogleGenAiEmbeddingConnectionDetails;
 import org.springframework.ai.google.genai.text.GoogleGenAiTextEmbeddingModel;
 import org.springframework.ai.google.genai.text.GoogleGenAiTextEmbeddingOptions;
@@ -51,6 +54,16 @@ class AiDevConfiguration {
         var connection = GoogleGenAiEmbeddingConnectionDetails.builder().genAiClient(geminiClient).build();
         var options = GoogleGenAiTextEmbeddingOptions.builder().model(MODEL).dimensions(DIMENSIONS).build();
         return new GoogleGenAiTextEmbeddingModel(connection, options, new RetryTemplate(RetryPolicy.withMaxRetries(0)));
+    }
+
+    @Bean
+    @Lazy
+    @Conditional(GeminiKeyPresent.class)
+    ChatModel geminiShoppingChatModel(Client geminiClient, @Value("${eshop.ai.chat.model}") String model) {
+        return GoogleGenAiChatModel.builder().genAiClient(geminiClient)
+                .options(GoogleGenAiChatOptions.builder().model(model.strip()).maxOutputTokens(1024).build())
+                .retryTemplate(new RetryTemplate(RetryPolicy.withMaxRetries(0)))
+                .build();
     }
 
     @Bean(destroyMethod = "close")

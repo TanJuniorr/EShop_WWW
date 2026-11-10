@@ -16,12 +16,13 @@ final class ProductSearchQueryParser {
     private static final String NUMBER = "(\\d{1,3}(?:[.]\\d{3})+|\\d+(?:[.,]\\d+)?)";
     private static final String UNIT = "(trieu|tr|nghin|ngan|k|vnd|dong|d|₫)";
     private static final String MONEY = NUMBER + "(?: *" + UNIT + ")?";
+    private static final String PRICE_PREFIX = "(?:co +)?gia +";
     private static final String OPERATORS = "khong nho hon|khong lon hon|khong thap hon|khong cao hon|"
             + "nho hon hoac bang|lon hon hoac bang|khong vuot qua|khong qua|khong duoi|"
             + "toi da|toi thieu|it nhat|tro len|duoi|nho hon|thap hon|it hon|tren|lon hon|cao hon|hon|tu|<=|>=|≤|≥|<|>|=";
-    private static final Pattern RANGE = Pattern.compile(START + "(?:gia +)?tu +" + MONEY + " *(?:den|toi|[-–]) *" + MONEY + END);
-    private static final Pattern BOUND = Pattern.compile(START + "(?:gia +)?(" + OPERATORS + ") *" + MONEY + END);
-    private static final Pattern EXACT = Pattern.compile(START + "(gia +)?" + NUMBER + " *" + UNIT + END);
+    private static final Pattern RANGE = Pattern.compile(START + "(?:" + PRICE_PREFIX + ")?tu +" + MONEY + " *(?:den|toi|[-–]) *" + MONEY + END);
+    private static final Pattern BOUND = Pattern.compile(START + "(?:" + PRICE_PREFIX + ")?(" + OPERATORS + ") *" + MONEY + END);
+    private static final Pattern EXACT = Pattern.compile(START + "(" + PRICE_PREFIX + ")?" + NUMBER + " *" + UNIT + END);
     private static final Pattern GROUPED = Pattern.compile("\\d{1,3}(?:[.]\\d{3})+");
     private static final Pattern STOCK = Pattern.compile("(?<!khong )(?<!het )\\b(?:dang +)?(?:con hang|co san)\\b");
     private static final Pattern SORT = Pattern.compile("\\b(?:sap xep (?:theo )?)?"

@@ -14,7 +14,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -24,11 +23,10 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final ApplicationEventPublisher events;
 
-    public Page<Product> search(String keyword, Long categoryId, int page, int size) {
-        String kw = StringUtils.hasText(keyword) ? keyword.trim() : null;
+    public Page<Product> list(Long categoryId, int page, int size) {
         // Chặn size <= 0 (làm PageRequest ném lỗi) và size quá lớn từ API công khai.
         int safeSize = Math.max(1, Math.min(size, 100));
-        return productRepository.search(kw, categoryId,
+        return productRepository.listByCategory(categoryId,
                 PageRequest.of(Math.max(page, 0), safeSize, Sort.by("id").descending()));
     }
 

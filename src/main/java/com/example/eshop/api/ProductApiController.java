@@ -38,11 +38,10 @@ public class ProductApiController {
                                  @Size(max = 500) String imageUrl, @NotNull Long categoryId) {}
 
     @GetMapping                    // GUEST, CUSTOMER, SELLER
-    public Page<ProductDto> list(@RequestParam(required = false) String keyword,
-                                 @RequestParam(required = false) Long categoryId,
+    public Page<ProductDto> list(@RequestParam(required = false) Long categoryId,
                                  @RequestParam(defaultValue = "0") int page,
                                  @RequestParam(defaultValue = "10") int size) {
-        return productService.search(keyword, categoryId, page, size).map(ProductDto::from);
+        return productService.list(categoryId, page, size).map(ProductDto::from);
     }
 
     @GetMapping("/{id}")

@@ -19,16 +19,19 @@ API truy vấn trực tiếp Qdrant để tái sử dụng vector đã tạo, l�
 
 `GET /api/products/semantic-search?q=...&categoryId=...` là API công khai theo quy tắc GET sản phẩm hiện có. `categoryId` là tùy chọn. JSON là danh sách theo thứ hạng, gồm ID, tên, mô tả, giá, ảnh, danh mục, `inStock` và `score`. Không có kết quả trả danh sách rỗng. Query sai trả 400, vượt giới hạn trả 429 và AI không sẵn sàng trả 503.
 
-Trang `/products` có lựa chọn **Tìm kiếm thông thường** hoặc **Tìm kiếm thông minh bằng AI**. Cả hai dùng lại product cards, giá, ảnh, liên kết chi tiết và form giỏ hàng hiện tại. Chế độ AI dùng thông báo tải, không có kết quả hoặc dịch vụ tạm lỗi. Liên kết sang tìm thường là thao tác của người dùng và giao diện gắn nhãn AI riêng. Biểu mẫu xếp dọc trên màn hình nhỏ và nằm cùng hàng trên màn hình lớn.
+Trang `/products` có một ô **Tìm kiếm AI**. Trang hiển thị thông báo khi đang tải, khi kết quả rỗng hoặc khi dịch vụ gặp lỗi. Danh sách sản phẩm vẫn hỗ trợ lọc danh mục và phân trang khi không nhập truy vấn.
 
-Bật profile `ai-dev` và đặt key vào môi trường của tiến trình:
+Khởi động Qdrant, đặt Gemini API key và chạy ứng dụng với profile `ai-dev`.
 
 ```powershell
+docker compose up -d qdrant
 $env:GEMINI_API_KEY = Read-Host -MaskInput "Gemini API key"
 mvn spring-boot:run "-Dspring-boot.run.profiles=ai-dev"
 ```
 
-Mở `/products`, chọn chế độ AI rồi nhập câu tự nhiên. Có thể so sánh với chế độ thông thường bằng cùng câu. Profile mặc định vẫn chạy tìm theo tên và bỏ tùy chọn AI. Có thể tắt riêng AI Search trong `ai-dev` bằng `eshop.ai.semantic-search.enabled=false`.
+Mở `/products` và nhập câu tự nhiên vào ô tìm kiếm. Với profile mặc định hoặc khi đặt `eshop.ai.semantic-search.enabled=false`, trang hiển thị danh sách sản phẩm và ẩn ô tìm kiếm.
+
+Nếu chỉ mục Qdrant chưa có dữ liệu sản phẩm, chạy [đồng bộ ban đầu](PHASE4_REPORT.md).
 
 | Cấu hình | Mặc định |
 | --- | --- |
