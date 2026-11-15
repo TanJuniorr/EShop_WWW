@@ -4,6 +4,8 @@ import com.example.eshop.repository.tracking.TrackingRepository;
 import com.example.eshop.tracking.TrackingEvent;
 import com.example.eshop.tracking.TrackingEventType;
 
+import com.example.eshop.infrastructure.ai.QdrantProductIndex;
+import io.qdrant.client.grpc.Points.ScoredPoint;
 import com.example.eshop.service.ai.ProductEmbeddingService;
 import com.example.eshop.entity.Category;
 import com.example.eshop.entity.Product;
@@ -42,14 +44,17 @@ import org.springframework.web.context.WebApplicationContext;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 import static com.example.eshop.tracking.TrackingEventType.*;
+import static io.qdrant.client.ValueFactory.value;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.*;
@@ -90,6 +95,7 @@ class TrackingWebTest {
     @Autowired private UserRepository users;
     @MockitoBean private ChatModel model;
     @MockitoBean private ProductEmbeddingService embeddings;
+    @MockitoBean private QdrantProductIndex index;
     private MockMvc mvc;
     private Product phone;
     private Product headset;
@@ -187,10 +193,12 @@ class TrackingWebTest {
     }
 
     @Test
-    void aiSearchRecordsAppliedFiltersEmptyResultsErrorsAndOnlyRealClicks() throws Exception {
+    void aiSearchRecordsVectorResultsErrorsAndOnlyRealClicks() throws Exception {
         var browser = new MockHttpSession();
         choice(browser, true);
         String query = "Tìm các điện thoại có giá trên 5 triệu";
+        stubSearch(query, phone);
+        stubSearch("Điện thoại dưới 1 triệu");
         var search = mvc.perform(get("/products").session(browser).param("keyword", query))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Galaxy")))
@@ -208,8 +216,8 @@ class TrackingWebTest {
         assertEquals(1L, count(AI_SEARCH_RESULT_CLICK));
         assertEquals(1L, count(PRODUCT_CLICK));
         assertEquals(1L, rows("""
-                select count(*) from tracking_events where event_type='AI_SEARCH' and search_mode='FILTERS'
-                  and search_result_count=1 and min_price=5000000 and min_inclusive=false and category_id is not null
+                select count(*) from tracking_events where event_type='AI_SEARCH' and search_mode='VECTOR'
+                  and search_result_count=1 and min_price is null and max_price is null and category_id is null
                 """));
         assertEquals(1L, rows("select count(*) from tracking_events where search_status='OK' and search_result_count=0"));
         assertEquals(1L, rows("select count(*) from tracking_events where search_status='ERROR' and search_keyword is null"));
@@ -228,6 +236,7 @@ class TrackingWebTest {
         open(browser, openId).andExpect(status().isAccepted());
         open(browser, openId).andExpect(status().isAccepted());
         when(model.call(any(Prompt.class))).thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage("1 PRICE")))));
+        stubSearch("Điện thoại trên 5 triệu", phone);
         var response = mvc.perform(post("/ai/chat").session(browser).with(csrf().asHeader())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Điện thoại trên 5 triệu\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.products[0].id").value(phone.getId().intValue()))
@@ -357,6 +366,7 @@ class TrackingWebTest {
     void searchAndChatContinueWhenTheTrackingWriterCannotPersistEvents() throws Exception {
         var browser = new MockHttpSession();
         choice(browser, true);
+        stubSearch("Điện thoại trên 5 triệu", phone);
         doThrow(new DataAccessResourceFailureException("tracking unavailable")).when(store).append(any(UUID.class), anyList());
         mvc.perform(get("/products").session(browser).param("keyword", "Điện thoại trên 5 triệu"))
                 .andExpect(status().isOk()).andExpect(content().string(containsString("Galaxy")));
@@ -364,6 +374,16 @@ class TrackingWebTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.reply").value(containsString("Chào bạn")));
         tracking.awaitWrites();
         assertEquals(0L, rows("select count(*) from tracking_events"));
+    }
+
+    private void stubSearch(String query, Product... matches) {
+        var vector = new float[768];
+        vector[0] = query.hashCode();
+        when(embeddings.embed(query)).thenReturn(vector);
+        var hits = Arrays.stream(matches).map(product -> ScoredPoint.newBuilder()
+                .putPayload("product_id", value(product.getId()))
+                .setScore(.9f).build()).toList();
+        when(index.search(vector, 15, .55f, null, Duration.ofSeconds(3))).thenReturn(hits);
     }
 
     private ResultActions choice(MockHttpSession session, boolean allowed) throws Exception {

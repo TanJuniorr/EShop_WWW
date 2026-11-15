@@ -31,7 +31,6 @@ import static io.qdrant.client.WithPayloadSelectorFactory.enable;
 import static io.qdrant.client.WithPayloadSelectorFactory.include;
 import static io.qdrant.client.ConditionFactory.match;
 import static io.qdrant.client.ConditionFactory.matchKeyword;
-import static io.qdrant.client.ConditionFactory.matchValues;
 import static io.qdrant.client.QueryFactory.nearest;
 
 @Component
@@ -78,21 +77,10 @@ public class QdrantProductIndex {
     }
 
     public List<ScoredPoint> search(float[] vector, int limit, float threshold, Long categoryId, Duration deadline) {
-        return search(vector, limit, threshold, categoryId, null, deadline);
-    }
-
-    public List<ScoredPoint> search(float[] vector, int limit, float threshold, Long categoryId,
-                             List<Long> eligibleIds, Duration deadline) {
         var filter = Filter.newBuilder()
                 .addMust(matchKeyword("source", SOURCE))
                 .addMust(matchKeyword("embedding_model", AiDevConfiguration.MODEL));
-        if (eligibleIds != null) {
-            if (eligibleIds.isEmpty()) {
-                return List.of();
-            }
-            // MariaDB already applied category, price and stock to these IDs. Indexed metadata may lag.
-            filter.addMust(matchValues("product_id", eligibleIds));
-        } else if (categoryId != null) {
+        if (categoryId != null) {
             filter.addMust(match("category_id", categoryId));
         }
         return await(clients.getObject().queryAsync(QueryPoints.newBuilder()

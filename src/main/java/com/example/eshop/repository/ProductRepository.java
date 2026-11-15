@@ -11,7 +11,6 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.List;
 import java.util.Collection;
-import java.math.BigDecimal;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
@@ -20,26 +19,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByNameIgnoreCase(String name, Pageable limit);
 
     List<Product> findByNameStartingWithIgnoreCase(String name, Pageable limit);
-
-    String CATALOG_FILTERS = """
-            (:categoryId is null or p.category.id = :categoryId)
-            and (:min is null or p.price > :min or (:minInclusive = true and p.price = :min))
-            and (:max is null or p.price < :max or (:maxInclusive = true and p.price = :max))
-            and (:inStock = false or p.quantity > 0)
-            """;
-
-    @Query("select p.id from Product p where " + CATALOG_FILTERS)
-    List<Long> hybridCandidateIds(@Param("categoryId") Long categoryId,
-                                  @Param("min") BigDecimal min, @Param("minInclusive") boolean minInclusive,
-                                  @Param("max") BigDecimal max, @Param("maxInclusive") boolean maxInclusive,
-                                  @Param("inStock") boolean inStock);
-
-    @Query(value = "select p from Product p join fetch p.category where " + CATALOG_FILTERS,
-           countQuery = "select count(p) from Product p where " + CATALOG_FILTERS)
-    Page<Product> searchCatalog(@Param("categoryId") Long categoryId,
-                                @Param("min") BigDecimal min, @Param("minInclusive") boolean minInclusive,
-                                @Param("max") BigDecimal max, @Param("maxInclusive") boolean maxInclusive,
-                                @Param("inStock") boolean inStock, Pageable pageable);
 
     @Query("""
             select new com.example.eshop.repository.ProductIndexSnapshot(p.id, p.name, p.description, c.id, c.name)

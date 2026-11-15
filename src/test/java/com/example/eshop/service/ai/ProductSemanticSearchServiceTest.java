@@ -2,11 +2,11 @@ package com.example.eshop.service.ai;
 
 import com.example.eshop.infrastructure.ai.QdrantProductIndex;
 
-import com.example.eshop.entity.Category;
-import com.example.eshop.repository.CategoryRepository;
 import com.example.eshop.repository.ProductRepository;
 import io.grpc.Status;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
@@ -19,9 +19,8 @@ class ProductSemanticSearchServiceTest {
     private final ProductEmbeddingService embeddings = mock(ProductEmbeddingService.class);
     private final QdrantProductIndex index = mock(QdrantProductIndex.class);
     private final ProductRepository products = mock(ProductRepository.class);
-    private final CategoryRepository categories = mock(CategoryRepository.class);
     private final ProductSemanticSearchService search =
-            new ProductSemanticSearchService(embeddings, index, products, categories, 5, 0.25f, 24, 800, 1, 2);
+            new ProductSemanticSearchService(embeddings, index, products, 5, 0.25f, 24, 800, 1, 2);
 
     @Test
     void rejectsInvalidInputBeforeCallingExternalServices() {
@@ -60,33 +59,37 @@ class ProductSemanticSearchServiceTest {
         verifyNoInteractions(products);
     }
 
-    @Test
-    void scopesOnlyClearLeadingCategoriesAndRespectsExplicitFilters() {
-        var search = new ProductSemanticSearchService(embeddings, index, products, categories,
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Điện thoại", "iPhone", "iPhone 15", "Điện thoại Samsung",
+            "điện thoại chip A16", "điện thoại AMOLED", "điện thoại trên 5 triệu",
+            "Sản phẩm từ 1 đến 3 triệu", "Dưới 5 triệu", "Laptop còn hàng",
+            "Điện thoại giá thấp nhất", "Điện thoại từ 10 đến 5 triệu"
+    })
+    void everyFormerRuleUsesTheCompleteQueryAndVectorSearch(String query) {
+        var search = new ProductSemanticSearchService(embeddings, index, products,
                 5, .25f, 100, 800, 1, 10);
-        var deadline = Duration.ofMillis(800);
-        when(categories.findAllByOrderByNameAsc()).thenReturn(List.of(
-                category(1L, "Điện thoại"), category(2L, "Chuột"), category(3L, "Laptop")));
-        when(embeddings.embed(anyString())).thenAnswer(call -> new float[768]);
+        var vector = new float[768];
+        when(embeddings.embed(query)).thenReturn(vector);
+        when(index.search(vector, 15, .25f, null, Duration.ofMillis(800))).thenReturn(List.of());
 
-        search.search("Toi can dien thoai phu hop cho sinh vien", null);
-        search.search("Chuột không dây cho laptop", null);
-        search.search("Ốp lưng điện thoại", null);
-        search.search("Điện thoại hoặc laptop", null);
-        search.search("Điện thoại", 3L);
+        var result = search.search(query, null, 0);
 
-        var calls = inOrder(index);
-        calls.verify(index).search(any(float[].class), eq(15), eq(.25f), eq(1L), eq(deadline));
-        calls.verify(index).search(any(float[].class), eq(15), eq(.25f), eq(2L), eq(deadline));
-        calls.verify(index, times(2)).search(any(float[].class), eq(15), eq(.25f), isNull(), eq(deadline));
-        calls.verify(index).search(any(float[].class), eq(15), eq(.25f), eq(3L), eq(deadline));
+        assertEquals(ProductSemanticSearchService.SearchMode.VECTOR, result.mode());
+        assertNull(result.filters().categoryId());
+        verify(embeddings).embed(query);
+        verify(index).search(vector, 15, .25f, null, Duration.ofMillis(800));
+        verifyNoInteractions(products);
     }
 
-    private static Category category(long id, String name) {
-        var category = new Category();
-        category.setId(id);
-        category.setName(name);
-        return category;
+    @ParameterizedTest
+    @ValueSource(strings = {"Điện thoại", "iPhone", "chip A16", "Dưới 5 triệu"})
+    void quotaFailureNeverFallsBackToCatalogRules(String query) {
+        when(embeddings.embed(query)).thenThrow(new ProductEmbeddingService.ProviderFailure("quota", true));
+
+        assertStatus(503, () -> search.search(query, null));
+
+        verifyNoInteractions(index, products);
     }
 
     private static void assertStatus(int expected, Runnable call) {

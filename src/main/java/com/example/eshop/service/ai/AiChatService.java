@@ -1,8 +1,7 @@
 package com.example.eshop.service.ai;
 
-import com.example.eshop.ai.ProductSearchQueryParser;
+import com.example.eshop.ai.ChatText;
 
-import com.example.eshop.ai.CatalogRequirements;
 
 import com.example.eshop.entity.Product;
 import com.google.genai.errors.ApiException;
@@ -293,7 +292,7 @@ public class AiChatService {
     }
 
     private static String generalReply(String question) {
-        String words = ProductSearchQueryParser.words(question);
+        String words = ChatText.words(question);
         if (words.matches("(xin chao|chao( ban| shop| eshop)?|hello|hi)")) {
             return "Chào bạn! Mình có thể tìm sản phẩm theo nhu cầu, ngân sách hoặc so sánh các mẫu đang có ở eShop.";
         }

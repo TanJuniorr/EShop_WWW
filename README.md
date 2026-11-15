@@ -50,7 +50,9 @@ mvn spring-boot:run
 - Truy cập `http://localhost:8080`.
 - Nếu port 8080 đã được dùng, chỉnh `server.port` trong `application.properties`.
 
-Trang `/products` dùng tìm kiếm AI khi chạy với profile `ai-dev`. Xem [cách cấu hình Gemini và Qdrant](docs/PHASE5_REPORT.md#api-giao-diện-và-cách-chạy).
+Trang `/products` dùng tìm kiếm AI khi chạy với profile `ai-dev`. Mọi câu tìm kiếm hợp lệ đều được gửi nguyên nội dung (sau chuẩn hóa Unicode và khoảng trắng) tới Gemini Embedding rồi tìm vector trong Qdrant. Bộ lọc danh mục trên giao diện hoặc tham số `categoryId` vẫn được áp dụng. Xem [cách cấu hình Gemini và Qdrant](docs/PHASE5_REPORT.md#api-giao-diện-và-cách-chạy).
+
+Đã bỏ các quy tắc nhận diện hãng, dòng máy, chip, màn hình, giá và tồn kho cùng nhánh tìm trực tiếp MariaDB. Giá và tồn kho hiển thị vẫn được đọc từ MariaDB. Câu có điều kiện giá/tồn kho được tìm theo ngữ nghĩa, không bảo đảm lọc số học chính xác. Khi Gemini hết quota hoặc dịch vụ AI lỗi, tìm kiếm báo tạm thời không hoạt động. Thay đổi này thay thế mô tả về tìm kiếm theo quy tắc trong các báo cáo giai đoạn trước.
 
 Nút **Trợ lý AI** mở chatbot tư vấn sản phẩm, ngân sách và so sánh mẫu. Xem [cách bật và sử dụng chatbot](docs/PHASE6_CHATBOT_REPORT.md).
 

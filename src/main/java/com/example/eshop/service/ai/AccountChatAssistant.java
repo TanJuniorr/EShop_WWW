@@ -1,6 +1,6 @@
 package com.example.eshop.service.ai;
 
-import com.example.eshop.ai.ProductSearchQueryParser;
+import com.example.eshop.ai.ChatText;
 
 import com.example.eshop.cart.Cart;
 import com.example.eshop.entity.Order;
@@ -36,7 +36,7 @@ class AccountChatAssistant {
     }
 
     Answer answer(String question, String username) {
-        String words = ProductSearchQueryParser.words(question);
+        String words = ChatText.words(question);
         if (words.matches(".*\\b(mat khau|password)\\b.*")) {
             return new Answer("Mình không thể xem hoặc đổi mật khẩu qua chat. Mật khẩu được lưu dưới dạng mã hóa; "
                     + "đừng gửi mật khẩu hay mã xác thực vào cuộc trò chuyện.", false);

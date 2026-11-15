@@ -23,6 +23,7 @@ class AiChatServiceTest {
     @Test
     void databaseFailureReturnsServiceUnavailableWithoutInternalDetails() {
         String question = "Laptop dưới 15 triệu";
+        when(retrieval.isProductQuestion(question)).thenReturn(true);
         when(retrieval.retrieve(eq(question), any())).thenThrow(new DataAccessResourceFailureException("private JDBC failure"));
         var failure = assertThrows(ResponseStatusException.class,
                 () -> chat.chat(new MockHttpSession(), null, null, question));

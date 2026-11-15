@@ -58,7 +58,7 @@ class ProductSemanticSearchWebTest {
         when(embeddings.embed(text)).thenReturn(vector);
         var hits = List.of(point(99_999L, .99f), point(second.getId(), .90f), point(first.getId(), .72f),
                 point(second.getId(), .65f));
-        when(index.search(vector, 15, .55f, category.getId(), Duration.ofSeconds(3))).thenReturn(hits);
+        when(index.search(vector, 15, .55f, null, Duration.ofSeconds(3))).thenReturn(hits);
         var mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
         mvc.perform(get("/api/products/semantic-search").param("q", text))
@@ -90,7 +90,7 @@ class ProductSemanticSearchWebTest {
     }
 
     @Test
-    void phoneQueryExcludesRobotEvenIfItsVectorScoresHigher() throws Exception {
+    void onlyExplicitCategoryFiltersRestrictVectorResults() throws Exception {
         var phones = saveCategory("Điện thoại");
         var appliances = saveCategory("Gia dụng thông minh");
         var phone = save(phones, "iPhone 15", 4);
@@ -98,14 +98,16 @@ class ProductSemanticSearchWebTest {
         String query = "điện thoại phù hợp cho sinh viên";
         float[] vector = new float[768];
         when(embeddings.embed(query)).thenReturn(vector);
-        when(index.search(vector, 15, .55f, phones.getId(), Duration.ofSeconds(3)))
-                .thenReturn(List.of(point(robot.getId(), .91f), point(phone.getId(), .83f)));
+        var hits = List.of(point(robot.getId(), .91f), point(phone.getId(), .83f));
+        when(index.search(vector, 15, .55f, null, Duration.ofSeconds(3))).thenReturn(hits);
+        when(index.search(vector, 15, .55f, phones.getId(), Duration.ofSeconds(3))).thenReturn(hits);
 
         var mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         mvc.perform(get("/api/products/semantic-search").param("q", query))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(phone.getId().intValue()));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(robot.getId().intValue()))
+                .andExpect(jsonPath("$[1].id").value(phone.getId().intValue()));
         mvc.perform(get("/products").param("keyword", query).param("categoryId", phones.getId().toString()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("iPhone 15")))

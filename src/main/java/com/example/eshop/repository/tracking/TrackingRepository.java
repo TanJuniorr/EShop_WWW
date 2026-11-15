@@ -92,10 +92,10 @@ public class TrackingRepository {
                 .param("keyword", search == null ? null : search.keyword()).param("resultCount", search == null ? null : search.count())
                 .param("duration", search == null ? null : search.durationMs()).param("status", search == null ? null : search.status())
                 .param("mode", search == null || search.mode() == null ? null : search.mode().name())
-                .param("category", filters == null ? null : filters.categoryId()).param("minPrice", filters == null ? null : filters.min())
-                .param("maxPrice", filters == null ? null : filters.max()).param("minInclusive", filters == null ? null : filters.minInclusive())
-                .param("maxInclusive", filters == null ? null : filters.maxInclusive()).param("stock", filters == null ? null : filters.inStock())
-                .param("sort", filters == null ? null : filters.orderLabel()).param("at", event.at()).update();
+                .param("category", filters == null ? null : filters.categoryId())
+                .param("minPrice", null).param("maxPrice", null).param("minInclusive", null)
+                .param("maxInclusive", null).param("stock", null).param("sort", null)
+                .param("at", event.at()).update();
     }
 
     @Transactional

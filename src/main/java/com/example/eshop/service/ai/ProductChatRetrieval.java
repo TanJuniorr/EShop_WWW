@@ -1,8 +1,6 @@
 package com.example.eshop.service.ai;
 
-import com.example.eshop.ai.CatalogRequirements;
-import com.example.eshop.ai.ProductSearchQueryParser;
-import com.example.eshop.config.ai.AiDevConfiguration;
+import com.example.eshop.ai.ChatText;
 
 import com.example.eshop.entity.Product;
 import com.example.eshop.entity.Category;
@@ -25,10 +23,6 @@ import java.util.stream.Collectors;
 @Component
 @Profile("ai-dev")
 class ProductChatRetrieval {
-    private static final Pattern BUDGET = Pattern.compile(
-            "(?iu)^(?:(?:tôi|toi|mình|minh|em) +)?(?:có|co|ngân sách(?: là)?|ngan sach(?: la)?) +"
-                    + "(\\d+(?:[.,]\\d+)*(?: *(?:triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k|vnd|đồng|dong|₫|đ))?)"
-                    + "(?=[ ,?!]|$)");
     private static final Pattern COMPARE = Pattern.compile(
             "(?iu)^(?:(?:hãy|hay) +)?so +(?:sánh|sanh) +(.+?) +(?:và|va|với|voi|vs\\.?) +(.+?)[?.!]*$");
     private static final Pattern COMPARE_RECENT = Pattern.compile(
@@ -37,8 +31,6 @@ class ProductChatRetrieval {
     private static final Pattern PRODUCT_INTENT = Pattern.compile(
             "\\b(?:tim|mua|san pham|mat hang|gia|bao nhieu|re nhat|dat nhat|thap nhat|cao nhat|"
                     + "ngan sach|con hang|co san|so sanh|man hinh|amoled|oled|chip|cau hinh|tot nhat)\\b");
-    private static final Pattern LOOKUP = Pattern.compile(
-            "(?iu)^(?:(?:shop|eshop|cửa hàng) +)?(?:có +(.+?) +không|giá (?:của +)?(.+?))[?.!]*$");
     private static final Pattern WITHIN_RESULTS = Pattern.compile(
             "\\b(?:trong (?:cac|nhung) mau|mau nao|loai nao|cai nao|may nao)\\b");
     private static final Pattern ALTERNATIVE = Pattern.compile(
@@ -51,7 +43,6 @@ class ProductChatRetrieval {
     private final ObjectProvider<ProductSemanticSearchService> semantic;
     private final ProductRepository products;
     private final CategoryRepository categories;
-    private final ProductSearchQueryParser parser = new ProductSearchQueryParser();
     private final int maxProducts;
 
     ProductChatRetrieval(ObjectProvider<ProductSemanticSearchService> semantic, ProductRepository products,
@@ -64,8 +55,8 @@ class ProductChatRetrieval {
     }
 
     boolean isProductQuestion(String message) {
-        String words = ProductSearchQueryParser.words(message);
-        if (PRODUCT_INTENT.matcher(words).find()) {
+        String words = ChatText.words(message);
+        if (PRODUCT_INTENT.matcher(words).find() || ALTERNATIVE.matcher(words).matches()) {
             return true;
         }
         String padded = " " + words + " ";
@@ -81,13 +72,9 @@ class ProductChatRetrieval {
             return compare(comparison.group(1), comparison.group(2));
         }
 
-        String words = ProductSearchQueryParser.words(message);
+        String words = ChatText.words(message);
         if (COMPARE_RECENT.matcher(words).matches()) {
             return compareRecent(previous);
-        }
-        String brand = CatalogRequirements.followUpBrand(words);
-        if (brand != null) {
-            return refineBrand(brand, previous);
         }
         if (ALTERNATIVE.matcher(words).matches() || words.matches("(?:co )?re hon(?: khong)?")) {
             return previous == null ? Result.say(NEED_REFERENCE) : alternatives(words, previous);
@@ -96,45 +83,15 @@ class ProductChatRetrieval {
             return previous == null ? Result.say(NEED_REFERENCE) : withinResults(words, previous);
         }
 
-        var lookup = LOOKUP.matcher(message);
-        if (lookup.matches()) {
-            String name = lookup.group(1) == null ? lookup.group(2) : lookup.group(1);
-            var requirements = CatalogRequirements.parse(ProductSearchQueryParser.words(name));
-            if (parser.parse(name).hasConstraints() || requirements.chip() != null || requirements.brand() != null) {
-                return search(name, null, List.of(), Kind.RECOMMEND);
-            }
-            var matches = namedProducts(name);
-            if (matches.size() != 1) {
-                return clarifyName(name, matches);
-            }
-            return new Result(Kind.RECOMMEND, matches, Context.of(matches.get(0).getName(), null, null, matches), null);
-        }
-        String query = withBudget(message);
-        return query == null ? Result.say("Bạn cho mình biết ngân sách tính bằng đồng, nghìn hay triệu nhé.")
-                : search(query, null, List.of(), Kind.RECOMMEND);
+        return search(message, null, List.of(), Kind.RECOMMEND);
     }
 
     private static List<String> categoryAliases(Category category) {
-        String name = ProductSearchQueryParser.words(category.getName());
+        String name = ChatText.words(category.getName());
         if (name.equals("ban phim chuot")) {
             return List.of(name, "ban phim", "chuot");
         }
         return List.of(name);
-    }
-
-    private Result refineBrand(String brand, Context previous) {
-        if (previous == null || previous.query() == null) {
-            return Result.say("Bạn muốn tìm loại sản phẩm nào của hãng này?");
-        }
-        Long category = previous.filters() == null ? previous.explicitCategory() : previous.filters().categoryId();
-        if (category == null) {
-            var categories = liveProducts(previous).stream().map(product -> product.getCategory().getId()).distinct().toList();
-            if (categories.size() != 1) {
-                return Result.say("Bạn muốn tìm loại sản phẩm nào của hãng này?");
-            }
-            category = categories.get(0);
-        }
-        return search(previous.query(), category, List.of(), Kind.RECOMMEND, brand);
     }
 
     private Result compare(String first, String second) {
@@ -186,7 +143,7 @@ class ProductChatRetrieval {
     private Result withinResults(String words, Context previous) {
         var current = liveProducts(previous).stream()
                 .filter(p -> previous.filters() == null || previous.filters().matches(p))
-                .filter(p -> !words.contains("con hang") && !words.contains("co san") || p.getQuantity() > 0)
+                .filter(p -> !words.contains("con hang") && !words.matches(".*\\bco san(?! pham\\b).*") || p.getQuantity() > 0)
                 .toList();
         if (current.isEmpty()) {
             return Result.say("Các mẫu vừa xem hiện không còn đáp ứng điều kiện này.");
@@ -207,8 +164,6 @@ class ProductChatRetrieval {
             return Result.say(NEED_REFERENCE);
         }
         Long category = previous.explicitCategory();
-        // Let semantic search infer the category again if it came from the user's query.
-        // That keeps category-and-price-only follow-ups on the structured catalog path.
         if ((previous.filters() == null || previous.filters().categoryId() == null)
                 && references.stream().map(p -> p.getCategory().getId()).distinct().count() == 1) {
             category = references.get(0).getCategory().getId();
@@ -216,18 +171,13 @@ class ProductChatRetrieval {
         String query = previous.query() == null ? references.get(0).getName() : previous.query();
         if (words.contains("re hon")) {
             BigDecimal price = references.stream().map(Product::getPrice).min(BigDecimal::compareTo).orElseThrow();
-            if (previous.filters() != null && previous.filters().min() != null
-                    && price.compareTo(previous.filters().min()) <= 0) {
-                return Result.say("Mình chưa tìm được mẫu rẻ hơn trong khoảng giá bạn đã chọn.");
-            }
             query += " dưới " + price.stripTrailingZeros().toPlainString() + " đồng";
         }
-        boolean stock = words.contains("con hang") || words.contains("co san");
+        boolean stock = words.contains("con hang") || words.matches(".*\\bco san(?! pham\\b).*");
         if (stock) {
             query += " còn hàng";
         }
-        String brand = previous.filters() == null ? null : previous.filters().requirements().brand();
-        return search(query, category, stock ? List.of() : previous.ids(), Kind.ALTERNATIVE, brand);
+        return search(query, category, stock ? List.of() : previous.ids(), Kind.ALTERNATIVE);
     }
 
     private List<Product> liveProducts(Context previous) {
@@ -237,10 +187,6 @@ class ProductChatRetrieval {
     }
 
     private Result search(String query, Long category, List<Long> exclude, Kind kind) {
-        return search(query, category, exclude, kind, null);
-    }
-
-    private Result search(String query, Long category, List<Long> exclude, Kind kind, String brand) {
         var search = semantic.getIfAvailable();
         if (search == null) {
             throw ProductSemanticSearchService.unavailable();
@@ -248,41 +194,15 @@ class ProductChatRetrieval {
         if (query.length() > search.maxLength()) {
             return Result.say("Bạn rút gọn mô tả nhu cầu để mình tiếp tục tìm sản phẩm nhé.");
         }
-        var parsed = parser.parse(query);
-        boolean priceExtreme = parsed.order() == ProductSearchQueryParser.Order.PRICE_ASC
-                || parsed.order() == ProductSearchQueryParser.Order.PRICE_DESC;
-        var result = search.search(query, category, 0, exclude, brand);
+        var result = search.search(query, category, 0, exclude);
         var matches = result.hits().stream().map(ProductSemanticSearchService.Hit::product)
                 .filter(p -> !exclude.contains(p.getId()) && result.filters().matches(p))
-                .limit(priceExtreme ? 1 : maxProducts).toList();
+                .limit(maxProducts).toList();
         var context = Context.of(query, category, result.filters(), matches);
         if (matches.isEmpty()) {
-            return brand == null ? Result.say(EMPTY) : new Result(null, matches, context, EMPTY);
-        }
-        if (priceExtreme) {
-            boolean cheapest = parsed.order() == ProductSearchQueryParser.Order.PRICE_ASC;
-            String categoryName = matches.get(0).getCategory().getName();
-            return new Result(Kind.PRICE_EXTREME, matches, context,
-                    "Trong danh mục " + categoryName + ", đây là mẫu có giá "
-                            + (cheapest ? "thấp nhất" : "cao nhất") + " theo dữ liệu hiện có:");
+            return new Result(null, matches, context, EMPTY);
         }
         return new Result(kind, matches, context, null);
-    }
-
-    private static String withBudget(String message) {
-        var match = BUDGET.matcher(message);
-        if (!match.find()) {
-            return message;
-        }
-        String amount = match.group(1);
-        if (amount.matches("[\\d.,]+") && !amount.matches("\\d{4,}|\\d{1,3}(?:[.]\\d{3})+")) {
-            return null;
-        }
-        String rest = message.substring(match.end()).replaceFirst("^[ ,]+", "");
-        if (ProductSearchQueryParser.words(rest).matches("(?:mua (?:duoc )?gi)?")) {
-            rest = "";
-        }
-        return (rest + " không quá " + amount).strip();
     }
 
     enum Kind { RECOMMEND, COMPARE, ALTERNATIVE, PRICE_EXTREME, PICK }
