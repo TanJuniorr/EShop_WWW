@@ -33,6 +33,8 @@ class ProductChatRetrieval {
                     + "ngan sach|con hang|co san|so sanh|man hinh|amoled|oled|chip|cau hinh|tot nhat)\\b");
     private static final Pattern WITHIN_RESULTS = Pattern.compile(
             "\\b(?:trong (?:cac|nhung) mau|mau nao|loai nao|cai nao|may nao)\\b");
+    private static final List<String> DISPLAY_TECHNOLOGIES = List.of(
+            "dynamic amoled", "super amoled", "amoled", "oled", "ips lcd");
     private static final Pattern ALTERNATIVE = Pattern.compile(
             "^(?:(?:co|con) )?(?:mau|loai|san pham|cai|may) (?:nao |khac |tuong tu )*"
                     + "(?:khac|tuong tu|re hon|con hang|co san)(?: khong)?$");
@@ -83,7 +85,19 @@ class ProductChatRetrieval {
             return previous == null ? Result.say(NEED_REFERENCE) : withinResults(words, previous);
         }
 
-        return search(message, null, List.of(), Kind.RECOMMEND);
+        return search(message, explicitCategory(message), List.of(), Kind.RECOMMEND);
+    }
+
+    private Long explicitCategory(String message) {
+        String padded = " " + ChatText.words(message) + " ";
+        return categories.findAllByOrderByNameAsc().stream()
+                .filter(category -> categoryAliases(category).stream()
+                        .anyMatch(alias -> padded.contains(" " + alias + " ")))
+                .max(Comparator.comparingInt(category -> categoryAliases(category).stream()
+                        .filter(alias -> padded.contains(" " + alias + " "))
+                        .mapToInt(String::length).max().orElse(0)))
+                .map(Category::getId)
+                .orElse(null);
     }
 
     private static List<String> categoryAliases(Category category) {
@@ -195,14 +209,34 @@ class ProductChatRetrieval {
             return Result.say("Bạn rút gọn mô tả nhu cầu để mình tiếp tục tìm sản phẩm nhé.");
         }
         var result = search.search(query, category, 0, exclude);
+        String requiredDisplayTechnology = requiredDisplayTechnology(query);
         var matches = result.hits().stream().map(ProductSemanticSearchService.Hit::product)
                 .filter(p -> !exclude.contains(p.getId()) && result.filters().matches(p))
+                // Embedding similarity is a recall/ranking signal, not proof that a product
+                // has a requested specification. Require explicit catalog evidence for display tech.
+                .filter(p -> matchesDisplayTechnology(p, requiredDisplayTechnology))
                 .limit(maxProducts).toList();
         var context = Context.of(query, category, result.filters(), matches);
         if (matches.isEmpty()) {
             return new Result(null, matches, context, EMPTY);
         }
         return new Result(kind, matches, context, null);
+    }
+
+    private static String requiredDisplayTechnology(String query) {
+        String words = ChatText.words(query);
+        return DISPLAY_TECHNOLOGIES.stream()
+                .filter(technology -> words.contains(technology))
+                .max(Comparator.comparingInt(String::length))
+                .orElse(null);
+    }
+
+    private static boolean matchesDisplayTechnology(Product product, String technology) {
+        if (technology == null) {
+            return true;
+        }
+        String description = ChatText.words(product.getDescription() == null ? "" : product.getDescription());
+        return description.contains(technology);
     }
 
     enum Kind { RECOMMEND, COMPARE, ALTERNATIVE, PRICE_EXTREME, PICK }
